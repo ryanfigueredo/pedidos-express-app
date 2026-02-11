@@ -1,0 +1,30 @@
+# Environment variables
+.env
+.env.local
+.env*.local
+.env.production
+
+# OS files
+.DS_Store
+*.swp
+*.swo
+*~
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Dependencies (se houver na raiz)
+node_modules/
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo

@@ -1,0 +1,198 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OrderStatus {
+  pending
+  printed
+  finished
+  out_for_delivery
+}
+
+enum BusinessType {
+  RESTAURANTE
+  DENTISTA
+}
+
+// Modelo Tenant (Multi-tenant)
+model Tenant {
+  id          String   @id @default(uuid())
+  name        String   // Nome do negócio (ex: "Tamboril Burguer" ou "Clínica Dental XYZ")
+  slug        String   @unique // Identificador único (ex: "tamboril-burguer")
+  api_key     String   @unique // API key única para cada tenant
+  whatsapp_phone String? // Telefone do WhatsApp do bot (formato: 5521999999999)
+  logo_url    String?  // URL da logo no S3
+  is_active   Boolean  @default(true)
+  business_type BusinessType @default(RESTAURANTE) // Tipo de negócio
+  show_prices_on_bot Boolean @default(true) // Exibir preços no bot (para dentistas pode ser false)
+  
+  // Credenciais Meta Cloud API (WhatsApp Business)
+  meta_phone_number_id String? // Phone Number ID da Meta
+  meta_access_token    String? // Access Token da Meta (criptografado)
+  meta_verify_token    String? // Verify Token para webhook
+  meta_business_account_id String? // Business Account ID
+  
+  // Status e configuração do bot
+  bot_configured       Boolean  @default(false) // Se o bot está configurado
+  bot_last_heartbeat   DateTime? // Última atividade do bot
+  
+  // Plano e limites
+  plan_type            String   @default("basic") // basic, complete, premium
+  plan_message_limit   Int      @default(1000) // Limite de mensagens do plano
+  
+  // Assinatura e pagamento
+  subscription_payment_date DateTime? // Data do último pagamento
+  subscription_expires_at   DateTime? // Data de vencimento da assinatura
+  asaas_subscription_id     String?   // ID da assinatura no Asaas
+  asaas_customer_id         String?   // ID do cliente no Asaas
+  subscription_status       String?   @default("active") // active, expired, cancelled, pending
+  
+  // Dados do cliente para pagamento (Asaas)
+  customer_cpf_cnpj         String?   // CPF ou CNPJ do cliente
+  customer_phone            String?   // Telefone do cliente (formato: 5521999999999)
+  customer_postal_code      String?   // CEP
+  customer_address          String?   // Endereço completo
+  customer_address_number   String?   // Número do endereço
+  customer_address_complement String? // Complemento
+  customer_province         String?   // Bairro
+  customer_city             String?   // Cidade
+  customer_state            String?   // Estado (UF)
+  
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  // Relações
+  orders      Order[]
+  users       User[]
+  message_usage MessageUsage[]
+  whatsapp_messages WhatsAppMessage[]
+  bot_messages BotMessage[]
+
+  @@map("tenants")
+}
+
+model Order {
+  id            String      @id @default(uuid())
+  tenant_id     String      // ID do tenant (restaurante)
+  customer_name String
+  customer_phone String
+  items         Json        // JSONB para produtos e quantidades
+  total_price   Decimal     @db.Decimal(10, 2)
+  status        OrderStatus @default(pending)
+  payment_method String?    // Método de pagamento (Dinheiro, PIX, Cartão, Crédito DMTN)
+  created_at    DateTime    @default(now())
+  order_number  Int?        // Número sequencial do pedido por telefone (001, 002, 003...)
+  daily_sequence Int?       // Número sequencial do dia (1, 2, 3...)
+  display_id    String?     // ID formatado como #1, #2, #3 (sequência diária)
+  customer_total_orders Int? // Total de pedidos que este cliente já fez (para promoções)
+  order_type    String?     // Tipo de pedido: 'restaurante', 'delivery', 'consulta', 'procedimento'
+  estimated_time Int?       // Tempo estimado em minutos
+  delivery_address String?  // Endereço de entrega (apenas para delivery) ou endereço do paciente (consulta domiciliar)
+  print_requested_at DateTime? // Quando o dashboard web solicitou impressão (app-admin imprime e limpa)
+  
+  // Campos específicos para agendamentos (dentistas)
+  appointment_date DateTime? // Data e hora do agendamento
+  appointment_type String?   // Tipo de agendamento: 'consulta', 'limpeza', 'canal', 'extracao', 'retorno', etc
+  doctor_notes String?      @db.Text // Observações do dentista
+  patient_notes String?     @db.Text // Observações do paciente
+
+  // Relação
+  tenant        Tenant      @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id])
+  @@index([tenant_id, created_at])
+  @@map("orders")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  tenant_id String?  // ID do tenant (null = super admin que pode acessar todos)
+  username  String
+  password  String   // Hash da senha (bcrypt)
+  name      String
+  role      String   @default("admin") // admin, manager, etc
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relação
+  tenant    Tenant?  @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@unique([tenant_id, username]) // Username único por tenant
+  @@index([tenant_id])
+  @@map("users")
+}
+
+// Controle de uso de mensagens WhatsApp
+model MessageUsage {
+  id          String   @id @default(uuid())
+  tenant_id   String
+  month       Int      // 1-12
+  year        Int      // 2026
+  messages_sent Int    @default(0)
+  conversations_started Int @default(0)
+  // Contadores por categoria
+  messages_service Int @default(0) // Mensagens de Serviço (gratuitas)
+  messages_utility Int @default(0) // Mensagens de Utilidade
+  messages_marketing Int @default(0) // Mensagens de Marketing
+  messages_auth Int @default(0) // Mensagens de Autenticação
+  // Custos em BRL
+  total_cost_brl Decimal @default(0) @db.Decimal(10, 4)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+  
+  tenant      Tenant   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  
+  @@unique([tenant_id, month, year])
+  @@index([tenant_id])
+  @@index([tenant_id, year, month])
+  @@map("message_usage")
+}
+
+// Rastreamento detalhado de mensagens WhatsApp individuais
+model WhatsAppMessage {
+  id          String   @id @default(uuid())
+  tenant_id   String
+  to_phone    String   // Número de destino
+  category    String   // SERVICE, UTILITY, MARKETING, AUTHENTICATION
+  cost_usd    Decimal  @default(0) @db.Decimal(10, 6) // Custo em USD
+  cost_brl    Decimal  @default(0) @db.Decimal(10, 4) // Custo em BRL
+  message_type String?  // text, template, interactive
+  template_name String? // Nome do template (se aplicável)
+  within_24h_window Boolean @default(true) // Se estava dentro da janela de 24h
+  created_at  DateTime @default(now())
+  
+  tenant      Tenant   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  
+  @@index([tenant_id])
+  @@index([tenant_id, created_at])
+  @@index([tenant_id, category])
+  @@index([tenant_id, category, created_at])
+  @@map("whatsapp_messages")
+}
+
+// Mensagens do bot WhatsApp por conversa (inbox atendimento + histórico)
+model BotMessage {
+  id             String   @id @default(uuid())
+  tenant_id      String
+  phone_number_id String? // Meta Phone Number ID
+  customer_phone String   // Telefone do cliente (apenas dígitos)
+  direction      String   // "in" | "out"
+  body           String   @db.Text
+  wamid          String?  // ID da mensagem na Meta (evitar duplicata)
+  attendant_name String?  // Nome do atendente (quando direction = out e foi enviado pelo painel)
+  created_at     DateTime @default(now())
+
+  tenant         Tenant   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id, customer_phone])
+  @@index([tenant_id, customer_phone, created_at])
+  @@map("bot_messages")
+}

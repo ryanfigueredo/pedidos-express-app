@@ -1,0 +1,5 @@
+# Ignorar node_modules e builds
+node_modules/
+.next/
+.vercel/
+*.log
