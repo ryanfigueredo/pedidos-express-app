@@ -57,7 +57,7 @@ export default function ClientesPage() {
   const [formData, setFormData] = useState({
     name: "",
     slug: "",
-    business_type: "RESTAURANTE" as "RESTAURANTE" | "DENTISTA",
+    business_type: "RESTAURANTE" as "RESTAURANTE" | "DENTISTA" | "BARBEIRO",
     show_prices_on_bot: true,
     plan_type: "basic" as "basic" | "complete" | "premium",
     username: "",
@@ -426,7 +426,7 @@ export default function ClientesPage() {
                     setFormData({ ...formData, name: e.target.value })
                   }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  placeholder={formData.business_type === "DENTISTA" ? "Ex: Clínica Dental XYZ" : "Ex: Pizzaria do João"}
+                  placeholder={formData.business_type === "DENTISTA" ? "Ex: Clínica Dental XYZ" : formData.business_type === "BARBEIRO" ? "Ex: Barbearia do João" : "Ex: Pizzaria do João"}
                 />
               </div>
 
@@ -447,7 +447,7 @@ export default function ClientesPage() {
                     })
                   }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  placeholder={formData.business_type === "DENTISTA" ? "Ex: clinica-dental-xyz" : "Ex: pizzaria-do-joao"}
+                  placeholder={formData.business_type === "DENTISTA" ? "Ex: clinica-dental-xyz" : formData.business_type === "BARBEIRO" ? "Ex: barbearia-do-joao" : "Ex: pizzaria-do-joao"}
                 />
                 <p className="mt-1 text-sm text-gray-500">
                   Apenas letras minúsculas, números e hífens
@@ -464,13 +464,14 @@ export default function ClientesPage() {
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      business_type: e.target.value as "RESTAURANTE" | "DENTISTA",
+                      business_type: e.target.value as "RESTAURANTE" | "DENTISTA" | "BARBEIRO",
                     })
                   }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 >
                   <option value="RESTAURANTE">Restaurante</option>
                   <option value="DENTISTA">Dentista</option>
+                  <option value="BARBEIRO">Barbeiro</option>
                 </select>
                 <p className="mt-1 text-sm text-gray-500">
                   Define o tipo de negócio e adapta a interface automaticamente
@@ -1142,6 +1143,86 @@ export default function ClientesPage() {
                                   {tenant.is_active ? "Desativar" : "Ativar"}
                                 </button>
                               </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Seção de Barbeiros */}
+            {tenants.filter(t => t.business_type === "BARBEIRO").length > 0 && (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+                <div className="px-6 py-4 border-b bg-gradient-to-r from-amber-50 to-amber-100/50">
+                  <h2 className="text-xl font-bold text-gray-900 font-display flex items-center gap-2">
+                    <span className="text-2xl">✂️</span>
+                    <span>Barbeiros</span>
+                    <span className="ml-2 px-2.5 py-0.5 bg-amber-200 text-amber-800 text-sm font-semibold rounded-full">
+                      {tenants.filter(t => t.business_type === "BARBEIRO").length}
+                    </span>
+                  </h2>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Slug</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bot WhatsApp</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {tenants.filter(t => t.business_type === "BARBEIRO").map((tenant) => {
+                        const botStatus = botStatuses.find(b => b.tenant_id === tenant.id);
+                        const isBotOnline = botStatus?.is_online || false;
+                        return (
+                          <tr key={tenant.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
+                              {tenant.name}
+                              <span className="ml-2 px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-700">✂️ Barbeiro</span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-gray-500">
+                              <code className="text-xs bg-gray-100 px-2 py-1 rounded">{tenant.slug}</code>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${tenant.is_active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-800"}`}>
+                                {tenant.is_active ? "Ativo" : "Inativo"}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`px-2 py-1 rounded text-xs ${isBotOnline ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
+                                {isBotOnline ? "Online" : "Offline"}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                              <button
+                                onClick={() => {
+                                  const currentTenant = tenants.find((t) => t.id === tenant.id);
+                                  if (showWhatsAppForm === tenant.id) {
+                                    setShowWhatsAppForm(null);
+                                  } else {
+                                    setShowWhatsAppForm(tenant.id);
+                                    setFormData({
+                                      ...formData,
+                                      whatsapp_phone: currentTenant?.whatsapp_phone || "",
+                                      meta_phone_number_id: "",
+                                      meta_access_token: "",
+                                      meta_verify_token: "",
+                                    });
+                                  }
+                                }}
+                                className="text-amber-600 hover:text-amber-800 font-medium mr-2 flex items-center gap-1"
+                                title="Configurar WhatsApp"
+                              >
+                                <Settings size={14} />
+                                WhatsApp
+                              </button>
+                              <button onClick={() => setShowUserForm(showUserForm === tenant.id ? null : tenant.id)} className="text-amber-600 hover:text-amber-800 text-xs font-medium">+ Usuário</button>
                             </td>
                           </tr>
                         );

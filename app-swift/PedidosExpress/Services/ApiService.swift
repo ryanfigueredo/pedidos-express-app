@@ -386,6 +386,23 @@ class ApiService {
         }
     }
     
+    /// Horários livres (barbeiro). Só retorna slots ainda não marcados.
+    func getAvailableSlots(date: Date) async throws -> [Slot] {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let dateStr = formatter.string(from: date)
+        let url = "\(baseURL)/api/app/slots/available?date=\(dateStr)"
+        guard let request = buildRequest(url: url, method: "GET") else {
+            return []
+        }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            return []
+        }
+        let decoded = try? decoder.decode(SlotsAvailableResponse.self, from: data)
+        return decoded?.slots ?? []
+    }
+    
     func updateOrderStatus(orderId: String, status: String) async throws {
         let url = "\(baseURL)/api/orders/\(orderId)/status"
         let body = try encoder.encode(["status": status])
@@ -1068,6 +1085,22 @@ class ApiService {
     }
     
     
+}
+
+struct Slot: Codable {
+    let id: String
+    let startTime: String
+    let endTime: String
+    enum CodingKeys: String, CodingKey {
+        case id
+        case startTime = "start_time"
+        case endTime = "end_time"
+    }
+}
+
+struct SlotsAvailableResponse: Codable {
+    let slots: [Slot]
+    let date: String
 }
 
 enum ApiError: LocalizedError {

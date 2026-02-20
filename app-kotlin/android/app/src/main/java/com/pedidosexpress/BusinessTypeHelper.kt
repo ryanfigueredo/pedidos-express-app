@@ -5,7 +5,7 @@ package com.pedidosexpress
  */
 object BusinessTypeHelper {
     private fun getLabel(user: User?, defaultLabel: String, dentistaLabel: String): String {
-        return if (user?.isDentista == true) dentistaLabel else defaultLabel
+        return if (user?.isDentista == true || user?.isBarbeiro == true) dentistaLabel else defaultLabel
     }
     
     // Labels principais

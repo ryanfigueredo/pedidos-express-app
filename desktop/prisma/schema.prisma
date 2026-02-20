@@ -20,6 +20,7 @@ enum OrderStatus {
 enum BusinessType {
   RESTAURANTE
   DENTISTA
+  BARBEIRO
 }
 
 // Modelo Tenant (Multi-tenant)
@@ -75,6 +76,7 @@ model Tenant {
   message_usage MessageUsage[]
   whatsapp_messages WhatsAppMessage[]
   bot_messages BotMessage[]
+  slots       Slot[]
 
   @@map("tenants")
 }
@@ -195,4 +197,22 @@ model BotMessage {
   @@index([tenant_id, customer_phone])
   @@index([tenant_id, customer_phone, created_at])
   @@map("bot_messages")
+}
+
+// Horários disponíveis para agendamento (barbeiro e outros)
+model Slot {
+  id         String   @id @default(uuid())
+  tenant_id  String
+  start_time DateTime // Início do slot (ex: 2025-03-15 09:00)
+  end_time   DateTime // Fim do slot (ex: 2025-03-15 09:30)
+  status     String   @default("available") // available | booked
+  order_id   String?  // Quando booked, referência ao Order (appointment)
+  created_at DateTime @default(now())
+
+  tenant     Tenant   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id])
+  @@index([tenant_id, start_time])
+  @@index([tenant_id, status, start_time])
+  @@map("slots")
 }

@@ -70,8 +70,10 @@ class OrdersActivity : AppCompatActivity() {
         
         ordersRecyclerView.layoutManager = LinearLayoutManager(this)
         
+        val authService = AuthService(this)
         ordersAdapter = OrdersAdapter(
             emptyList(),
+            isBarbeiro = authService.getUser()?.isBarbeiro == true,
             onPrint = { order ->
                 if (checkBluetoothPermissions()) {
                     printerHelper.printOrder(order)
@@ -103,6 +105,24 @@ class OrdersActivity : AppCompatActivity() {
             },
             onEdit = { order ->
                 startActivity(Intent(this, EditOrderActivity::class.java).putExtra("order_id", order.id))
+            },
+            onConcluir = { order ->
+                AlertDialog.Builder(this)
+                    .setTitle("Concluir")
+                    .setMessage("Marcar este agendamento como concluído?")
+                    .setPositiveButton("Sim") { _, _ ->
+                        CoroutineScope(Dispatchers.Main).launch {
+                            try {
+                                withContext(Dispatchers.IO) { apiService.updateOrderStatus(order.id, "finished") }
+                                Toast.makeText(this@OrdersActivity, "Concluído!", Toast.LENGTH_SHORT).show()
+                                loadOrders(false)
+                            } catch (e: Exception) {
+                                Toast.makeText(this@OrdersActivity, "Erro: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                    .setNegativeButton("Não", null)
+                    .show()
             },
             onWhatsApp = { order ->
                 openWhatsAppForCustomer(order.customerPhone)

@@ -16,6 +16,8 @@ class OrdersViewController: UIViewController {
     private var currentSection: OrderSection = .pending
     private var printedOrderIds = Set<String>()
     private var refreshTimer: Timer?
+    private var freeSlotsLabel: UILabel?
+    private var freeSlotsToday: [Slot] = []
     
     private let logger = Logger(subsystem: "com.pedidosexpress", category: "OrdersViewController")
     
@@ -30,21 +32,62 @@ class OrdersViewController: UIViewController {
         
         let authService = AuthService()
         let user = authService.getUser()
-        title = BusinessTypeHelper.ordersLabel(for: user)
+        title = user?.isBarbeiro == true ? "Esteira de agendamentos" : BusinessTypeHelper.ordersLabel(for: user)
         navigationItem.largeTitleDisplayMode = .never
         setupUI()
         setupTableView()
         requestBluetoothPermissions()
         loadOrders()
+        if user?.isBarbeiro == true {
+            loadFreeSlots()
+        }
         startAutoRefresh()
+    }
+    
+    private func loadFreeSlots() {
+        guard AuthService().getUser()?.isBarbeiro == true else { return }
+        Task { [weak self] in
+            guard let self = self else { return }
+            do {
+                let slots = try await self.apiService.getAvailableSlots(date: Date())
+                await MainActor.run {
+                    self.freeSlotsToday = slots
+                    let hours = slots.prefix(15).compactMap { s -> String? in
+                        guard s.startTime.count >= 16 else { return nil }
+                        let start = s.startTime.index(s.startTime.startIndex, offsetBy: 11)
+                        let end = s.startTime.index(start, offsetBy: 5)
+                        return String(s.startTime[start..<end])
+                    }
+                    self.freeSlotsLabel?.text = hours.isEmpty
+                        ? "Horários livres hoje: nenhum (todos já marcados)"
+                        : "Horários livres hoje: \(hours.joined(separator: ", "))"
+                }
+            } catch {
+                await MainActor.run {
+                    self.freeSlotsLabel?.text = "Horários livres hoje: —"
+                }
+            }
+        }
     }
     
     private func setupUI() {
         view.backgroundColor = .pedidosOrangeLight
         
-        // Segmented Control
+        // Barbeiro: label "Horários livres hoje" (só aparecem os que ainda não foram marcados)
         let authService = AuthService()
         let user = authService.getUser()
+        if user?.isBarbeiro == true {
+            let label = UILabel()
+            label.font = .systemFont(ofSize: 13)
+            label.textColor = .secondaryLabel
+            label.numberOfLines = 2
+            label.translatesAutoresizingMaskIntoConstraints = false
+            label.text = "Horários livres hoje: carregando..."
+            view.addSubview(label)
+            freeSlotsLabel = label
+        }
+        
+        // Segmented Control
         let pendingLabel = BusinessTypeHelper.pendingOrdersLabel(for: user)
         let outForDeliveryLabel = BusinessTypeHelper.outForDeliveryLabel(for: user)
         let finishedLabel = BusinessTypeHelper.finishedOrdersLabel(for: user)
@@ -71,33 +114,52 @@ class OrdersViewController: UIViewController {
         refreshControl.addTarget(self, action: #selector(refreshOrders), for: .valueChanged)
         ordersTableView.refreshControl = refreshControl
         
-        // Navigation Bar Button - Conectar Impressora
-        navigationItem.rightBarButtonItem = UIBarButtonItem(
-            title: "Impressora",
-            style: .plain,
-            target: self,
-            action: #selector(showPrinterConnection)
-        )
+        // Navigation Bar Button - Conectar Impressora (apenas para não-barbeiros)
+        let authServiceForBarButton = AuthService()
+        let userForBarButton = authServiceForBarButton.getUser()
+        if userForBarButton?.isBarbeiro != true {
+            navigationItem.rightBarButtonItem = UIBarButtonItem(
+                title: "Impressora",
+                style: .plain,
+                target: self,
+                action: #selector(showPrinterConnection)
+            )
+        } else {
+            navigationItem.rightBarButtonItem = nil
+        }
         
         // Constraints
-        NSLayoutConstraint.activate([
-            segmentedControl.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
+        var constraints: [NSLayoutConstraint] = [
             segmentedControl.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             segmentedControl.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            
+        ]
+        if let freeLabel = freeSlotsLabel {
+            constraints += [
+                freeLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
+                freeLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+                freeLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+                segmentedControl.topAnchor.constraint(equalTo: freeLabel.bottomAnchor, constant: 8),
+            ]
+        } else {
+            constraints.append(segmentedControl.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8))
+        }
+        constraints += [
             ordersTableView.topAnchor.constraint(equalTo: segmentedControl.bottomAnchor, constant: 8),
             ordersTableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             ordersTableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             ordersTableView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            
             progressIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            progressIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor)
-        ])
+            progressIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+        ]
+        NSLayoutConstraint.activate(constraints)
     }
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        updatePrinterButtonTitle()
+        let authService = AuthService()
+        if authService.getUser()?.isBarbeiro != true {
+            updatePrinterButtonTitle()
+        }
     }
     
     override func viewWillDisappear(_ animated: Bool) {
@@ -292,11 +354,22 @@ class OrdersViewController: UIViewController {
                 print("📱 OrdersViewController: Recebidos \(response.orders.count) pedidos da API")
                 #endif
                 
-                let sortedOrders = response.orders.sorted { 
-                    // Ordenar por data de criação (mais recente primeiro)
-                    let date1 = ISO8601DateFormatter().date(from: $0.createdAt) ?? Date.distantPast
-                    let date2 = ISO8601DateFormatter().date(from: $1.createdAt) ?? Date.distantPast
-                    return date1 > date2
+                let authService = AuthService()
+                let user = authService.getUser()
+                let sortedOrders: [Order]
+                if user?.isBarbeiro == true {
+                    // Barbeiro: ordenar por data do agendamento (appointment_date) quando existir
+                    sortedOrders = response.orders.sorted {
+                        let d1 = $0.appointmentDate.flatMap { ISO8601DateFormatter().date(from: $0) } ?? ISO8601DateFormatter().date(from: $0.createdAt) ?? Date.distantPast
+                        let d2 = $1.appointmentDate.flatMap { ISO8601DateFormatter().date(from: $1) } ?? ISO8601DateFormatter().date(from: $1.createdAt) ?? Date.distantPast
+                        return d1 < d2
+                    }
+                } else {
+                    sortedOrders = response.orders.sorted {
+                        let date1 = ISO8601DateFormatter().date(from: $0.createdAt) ?? Date.distantPast
+                        let date2 = ISO8601DateFormatter().date(from: $1.createdAt) ?? Date.distantPast
+                        return date1 > date2
+                    }
                 }
                 
                 #if DEBUG
@@ -312,7 +385,12 @@ class OrdersViewController: UIViewController {
                     print("📱 OrdersViewController: allOrders = \(self.allOrders.count), filteredOrders = \(self.filteredOrders.count)")
                     #endif
                     
-                    self.detectAndPrintNewOrders(sortedOrders)
+                    let authForPrint = AuthService()
+                    if authForPrint.getUser()?.isBarbeiro != true {
+                        self.detectAndPrintNewOrders(sortedOrders)
+                    } else {
+                        self.loadFreeSlots()
+                    }
                     
                     if !silent {
                         self.progressIndicator.stopAnimating()
@@ -459,28 +537,44 @@ class OrdersViewController: UIViewController {
         let orderLabel = BusinessTypeHelper.orderLabel(for: user)
         let alert = UIAlertController(title: "Opções do \(orderLabel)", message: nil, preferredStyle: .actionSheet)
         
-        // Se estiver em rota, mostrar opções de entrega
-        if order.status == "out_for_delivery" {
-            alert.addAction(UIAlertAction(title: "Confirmar Entrega", style: .default) { [weak self] _ in
-                self?.confirmDelivery(order)
-            })
-            
-            alert.addAction(UIAlertAction(title: "Reportar Problema", style: .destructive) { [weak self] _ in
-                self?.reportDeliveryProblem(order)
+        // Barbeiro: opção de chamar no WhatsApp
+        if user?.isBarbeiro == true {
+            let phone = order.customerPhone.trimmingCharacters(in: CharacterSet.decimalDigits.inverted)
+            if !phone.isEmpty {
+                alert.addAction(UIAlertAction(title: "Chamar no WhatsApp", style: .default) { _ in
+                    let clean = phone.hasPrefix("55") ? phone : "55\(phone)"
+                    if let url = URL(string: "https://wa.me/\(clean)") {
+                        UIApplication.shared.open(url)
+                    }
+                })
+            }
+            alert.addAction(UIAlertAction(title: "Concluir", style: .default) { [weak self] _ in
+                self?.updateOrderStatus(order, status: "finished")
             })
         } else {
-            // Opções normais para pedidos pendentes/impressos
-            alert.addAction(UIAlertAction(title: "Imprimir", style: .default) { [weak self] _ in
-                self?.printOrder(order)
-            })
-            
-            alert.addAction(UIAlertAction(title: "Editar", style: .default) { [weak self] _ in
-                self?.showEditOrderDialog(order)
-            })
-            
-            alert.addAction(UIAlertAction(title: "Enviar para Entrega", style: .default) { [weak self] _ in
-                self?.updateOrderStatus(order, status: "out_for_delivery")
-            })
+            // Se estiver em rota, mostrar opções de entrega
+            if order.status == "out_for_delivery" {
+                alert.addAction(UIAlertAction(title: "Confirmar Entrega", style: .default) { [weak self] _ in
+                    self?.confirmDelivery(order)
+                })
+                
+                alert.addAction(UIAlertAction(title: "Reportar Problema", style: .destructive) { [weak self] _ in
+                    self?.reportDeliveryProblem(order)
+                })
+            } else {
+                // Opções normais para pedidos pendentes/impressos
+                alert.addAction(UIAlertAction(title: "Imprimir", style: .default) { [weak self] _ in
+                    self?.printOrder(order)
+                })
+                
+                alert.addAction(UIAlertAction(title: "Editar", style: .default) { [weak self] _ in
+                    self?.showEditOrderDialog(order)
+                })
+                
+                alert.addAction(UIAlertAction(title: "Enviar para Entrega", style: .default) { [weak self] _ in
+                    self?.updateOrderStatus(order, status: "out_for_delivery")
+                })
+            }
         }
         
         alert.addAction(UIAlertAction(title: "Cancelar", style: .cancel))
@@ -931,6 +1025,32 @@ extension OrdersViewController: UITableViewDataSource, UITableViewDelegate {
     
     func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
         let order = filteredOrders[indexPath.row]
+        let authService = AuthService()
+        let user = authService.getUser()
+        
+        // Barbeiro: swipe para WhatsApp ou Concluir
+        if user?.isBarbeiro == true {
+            var actions: [UIContextualAction] = []
+            let phone = order.customerPhone.trimmingCharacters(in: CharacterSet.decimalDigits.inverted)
+            if !phone.isEmpty {
+                let waAction = UIContextualAction(style: .normal, title: "WhatsApp") { _, _, completion in
+                    let clean = phone.hasPrefix("55") ? phone : "55\(phone)"
+                    if let url = URL(string: "https://wa.me/\(clean)") {
+                        UIApplication.shared.open(url)
+                    }
+                    completion(true)
+                }
+                waAction.backgroundColor = .systemGreen
+                actions.append(waAction)
+            }
+            let doneAction = UIContextualAction(style: .normal, title: "Concluir") { [weak self] _, _, completion in
+                self?.updateOrderStatus(order, status: "finished")
+                completion(true)
+            }
+            doneAction.backgroundColor = .systemBlue
+            actions.append(doneAction)
+            return UISwipeActionsConfiguration(actions: actions)
+        }
         
         // Se estiver em rota, mostrar ações rápidas de entrega
         if order.status == "out_for_delivery" {

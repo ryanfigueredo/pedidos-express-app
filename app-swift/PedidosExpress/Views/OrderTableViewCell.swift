@@ -79,13 +79,18 @@ class OrderTableViewCell: UITableViewCell {
         let priceText = formatter.string(from: NSNumber(value: priceValue)) ?? "R$ 0,00"
         priceLabel.text = priceText
         
-        // Formatar hora
-        if let date = parseDate(order.createdAt) {
+        // Formatar hora: para agendamento mostrar horário do agendamento
+        if order.orderType == "appointment", let appDate = order.appointmentDate.flatMap({ parseDate($0) }) {
+            let timeFormatter = DateFormatter()
+            timeFormatter.dateFormat = "HH:mm"
+            timeLabel.text = "Horário: \(timeFormatter.string(from: appDate))"
+        } else if let displayId = order.displayId, order.orderType == "appointment", displayId.contains(":") {
+            timeLabel.text = "Horário: \(displayId)"
+        } else if let date = parseDate(order.createdAt) {
             let timeFormatter = DateFormatter()
             timeFormatter.dateFormat = "HH:mm"
             timeLabel.text = timeFormatter.string(from: date)
         } else {
-            // Tentar outros formatos
             let isoFormatter = ISO8601DateFormatter()
             if let isoDate = isoFormatter.date(from: order.createdAt) {
                 let timeFormatter = DateFormatter()
@@ -96,7 +101,7 @@ class OrderTableViewCell: UITableViewCell {
             }
         }
         
-        // Status
+        // Status (para barbeiro: "Impresso" como "Confirmado")
         let statusText: String
         let statusColor: UIColor
         switch order.status {
@@ -104,7 +109,7 @@ class OrderTableViewCell: UITableViewCell {
             statusText = "Pendente"
             statusColor = .systemOrange
         case "printed":
-            statusText = "Impresso"
+            statusText = order.orderType == "appointment" ? "Confirmado" : "Impresso"
             statusColor = .systemOrange
         case "out_for_delivery":
             statusText = "Em Rota"

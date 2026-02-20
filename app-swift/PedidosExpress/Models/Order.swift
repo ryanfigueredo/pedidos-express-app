@@ -11,6 +11,7 @@ struct Order: Codable {
     let displayId: String?
     let dailySequence: Int?
     let orderType: String?
+    let appointmentDate: String?
     let deliveryAddress: String?
     let paymentMethod: String?
     let subtotal: Double?
@@ -29,6 +30,7 @@ struct Order: Codable {
         case displayId = "display_id"
         case dailySequence = "daily_sequence"
         case orderType = "order_type"
+        case appointmentDate = "appointment_date"
         case deliveryAddress = "delivery_address"
         case paymentMethod = "payment_method"
         case subtotal
@@ -132,6 +134,7 @@ struct Order: Codable {
         displayId = try? container.decode(String.self, forKey: .displayId)
         dailySequence = try? container.decode(Int.self, forKey: .dailySequence)
         orderType = try? container.decode(String.self, forKey: .orderType)
+        appointmentDate = try? container.decode(String.self, forKey: .appointmentDate)
         deliveryAddress = try? container.decode(String.self, forKey: .deliveryAddress)
         paymentMethod = try? container.decode(String.self, forKey: .paymentMethod)
         printRequestedAt = try? container.decode(String.self, forKey: .printRequestedAt)
@@ -177,6 +180,7 @@ struct Order: Codable {
         try container.encodeIfPresent(displayId, forKey: .displayId)
         try container.encodeIfPresent(dailySequence, forKey: .dailySequence)
         try container.encodeIfPresent(orderType, forKey: .orderType)
+        try container.encodeIfPresent(appointmentDate, forKey: .appointmentDate)
         try container.encodeIfPresent(deliveryAddress, forKey: .deliveryAddress)
         try container.encodeIfPresent(paymentMethod, forKey: .paymentMethod)
         try container.encodeIfPresent(subtotal, forKey: .subtotal)

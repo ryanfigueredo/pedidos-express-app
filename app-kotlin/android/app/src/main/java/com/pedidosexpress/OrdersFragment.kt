@@ -83,6 +83,10 @@ class OrdersFragment : Fragment() {
         ordersRecyclerView = view.findViewById(R.id.orders_recycler)
         testPrintButton = view.findViewById(R.id.test_print_button)
         progressBar = view.findViewById(R.id.progress_bar)
+        // Barbeiro: ocultar botão de impressão
+        if (user?.isBarbeiro == true) {
+            testPrintButton.visibility = View.GONE
+        }
         swipeRefresh = view.findViewById(R.id.swipe_refresh)
         ordersTabs = view.findViewById(R.id.orders_tabs)
         val fabNewOrder = view.findViewById<FloatingActionButton>(R.id.fab_new_order)
@@ -94,6 +98,7 @@ class OrdersFragment : Fragment() {
         
         val ordersAdapter = OrdersAdapter(
             emptyList(),
+            isBarbeiro = user?.isBarbeiro == true,
             onPrint = { order ->
                 if (checkBluetoothPermissions()) {
                     printerHelper.printOrder(order)
@@ -106,6 +111,9 @@ class OrdersFragment : Fragment() {
             },
             onEdit = { order ->
                 showEditOrderDialog(order)
+            },
+            onConcluir = { order ->
+                updateOrderStatus(order, "finished", null)
             },
             onWhatsApp = { order ->
                 openWhatsAppForCustomer(order.customerPhone)
@@ -178,7 +186,13 @@ class OrdersFragment : Fragment() {
                 
                 android.util.Log.d("OrdersFragment", "Pedidos carregados: ${response.orders.size}")
                 
-                val sortedOrders = response.orders.sortedByDescending { it.createdAt }
+                val sortedOrders = if (authService.getUser()?.isBarbeiro == true) {
+                    response.orders.sortedWith(compareBy(
+                        { it.appointmentDate?.take(19) ?: it.createdAt.take(19) }
+                    ))
+                } else {
+                    response.orders.sortedByDescending { it.createdAt }
+                }
                 allOrders = sortedOrders
                 filterOrdersBySection()
                 
@@ -188,7 +202,9 @@ class OrdersFragment : Fragment() {
                     }
                 }
                 
-                detectAndPrintNewOrders(sortedOrders)
+                if (authService.getUser()?.isBarbeiro != true) {
+                    detectAndPrintNewOrders(sortedOrders)
+                }
                 
             } catch (e: Exception) {
                 android.util.Log.e("OrdersFragment", "Erro ao carregar pedidos", e)

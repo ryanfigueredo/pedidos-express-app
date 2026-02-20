@@ -108,6 +108,19 @@ function sanitizePedido(pedido) {
   if (pedido.tipoSelecionado != null && String(pedido.tipoSelecionado).trim()) {
     result.tipoSelecionado = String(pedido.tipoSelecionado);
   }
+  // Campos de agendamento (barbeiro)
+  if (pedido.servico_nome != null) result.servico_nome = String(pedido.servico_nome);
+  if (pedido.servico_preco != null) result.servico_preco = Number(pedido.servico_preco) || 0;
+  if (pedido.data_agendamento != null) result.data_agendamento = String(pedido.data_agendamento);
+  if (pedido.slot_id != null) result.slot_id = String(pedido.slot_id);
+  if (pedido.slot_hora != null) result.slot_hora = String(pedido.slot_hora);
+  if (Array.isArray(pedido._slots_list) && pedido._slots_list.length > 0) {
+    result._slots_list = pedido._slots_list.map((s) => ({
+      id: s.id,
+      start_time: s.start_time,
+      end_time: s.end_time,
+    }));
+  }
   return result;
 }
 

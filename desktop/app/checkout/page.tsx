@@ -24,7 +24,7 @@ function CheckoutContent() {
     // Dados do negócio
     business_name: "",
     business_slug: "",
-    business_type: "RESTAURANTE" as "RESTAURANTE" | "DENTISTA",
+    business_type: "RESTAURANTE" as "RESTAURANTE" | "DENTISTA" | "BARBEIRO",
     
     // Dados do usuário admin
     admin_name: "",
@@ -298,6 +298,7 @@ function CheckoutContent() {
                 >
                   <option value="RESTAURANTE">Restaurante</option>
                   <option value="DENTISTA">Clínica Dental</option>
+                  <option value="BARBEIRO">Barbeiro</option>
                 </select>
               </div>
               <div className="md:col-span-2">

@@ -9,6 +9,10 @@ const {
   isRestauranteConfig,
 } = require("./handlers-restaurante");
 const {
+  handleMessageBarbeiro,
+  isBarbeiroConfig,
+} = require("./handlers-barbeiro");
+const {
   getClientConfig,
   getClientConfigByBusinessAccountId,
   isDynamoDBEnabled,
@@ -298,7 +302,13 @@ async function processWebhook(body) {
 
         try {
           let result;
-          if (isRestauranteConfig(clientConfig)) {
+          if (isBarbeiroConfig(clientConfig)) {
+            result = await handleMessageBarbeiro(
+              userNumber,
+              messageText,
+              clientConfig
+            );
+          } else if (isRestauranteConfig(clientConfig)) {
             result = await handleMessageRestaurante(
               userNumber,
               messageText,

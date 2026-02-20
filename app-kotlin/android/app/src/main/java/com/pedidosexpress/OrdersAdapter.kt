@@ -15,9 +15,11 @@ import java.util.TimeZone
 
 class OrdersAdapter(
     private var orders: List<Order>,
+    private val isBarbeiro: Boolean = false,
     private val onPrint: (Order) -> Unit,
     private val onSendToDelivery: (Order) -> Unit,
     private val onEdit: (Order) -> Unit,
+    private val onConcluir: (Order) -> Unit,
     private val onWhatsApp: (Order) -> Unit,
     private val onConfirmDelivery: (Order) -> Unit,
     private val onReportProblem: (Order) -> Unit
@@ -59,18 +61,18 @@ class OrdersAdapter(
     override fun onBindViewHolder(holder: OrderViewHolder, position: Int) {
         val order = orders[position]
         val displayId = (order.displayId ?: order.id.take(8)).replace("#", "")
-        holder.orderId.text = "Pedido $displayId"
-        holder.orderTime.text = formatOrderTime(order.createdAt)
+        holder.orderId.text = if (isBarbeiro && order.orderType == "appointment") "Agendamento $displayId" else "Pedido $displayId"
+        holder.orderTime.text = if (isBarbeiro && order.appointmentDate != null) formatAppointmentTime(order.appointmentDate) else formatOrderTime(order.createdAt)
         holder.customerName.text = "Cliente: ${order.customerName}"
         val phoneDisplay = formatPhone(order.customerPhone)
         holder.customerPhone.text = "Tel: $phoneDisplay"
         holder.customerPhone.visibility = if (phoneDisplay.isNotBlank() && order.customerPhone != "local") View.VISIBLE else View.GONE
         holder.orderTotal.text = "Total: R$ ${String.format("%.2f", order.totalPrice)}"
         
-        // Status
+        // Status (barbeiro: "Impresso" -> "Confirmado" para agendamentos)
         val statusText = when (order.status) {
             "pending" -> "Pendente"
-            "printed" -> "Impresso"
+            "printed" -> if (isBarbeiro && order.orderType == "appointment") "Confirmado" else "Impresso"
             "finished" -> "Finalizado"
             "out_for_delivery" -> "Em rota"
             "cancelled" -> "Cancelado"
@@ -91,9 +93,20 @@ class OrdersAdapter(
                 onReportProblem(order)
             }
         } else {
-            holder.btnImprimir.setOnClickListener { onPrint(order) }
-            holder.btnEnviar.setOnClickListener { onSendToDelivery(order) }
-            holder.btnEditar.setOnClickListener { onEdit(order) }
+            if (isBarbeiro) {
+                holder.btnImprimir.visibility = View.GONE
+                holder.btnEnviar.visibility = View.GONE
+                holder.btnEditar.text = "Concluir"
+                holder.btnEditar.visibility = View.VISIBLE
+                holder.btnEditar.setOnClickListener { onConcluir(order) }
+            } else {
+                holder.btnImprimir.visibility = View.VISIBLE
+                holder.btnEnviar.visibility = View.VISIBLE
+                holder.btnEditar.text = "Editar"
+                holder.btnEditar.setOnClickListener { onEdit(order) }
+                holder.btnImprimir.setOnClickListener { onPrint(order) }
+                holder.btnEnviar.setOnClickListener { onSendToDelivery(order) }
+            }
         }
         holder.btnWhatsapp.setOnClickListener { onWhatsApp(order) }
         
@@ -131,6 +144,19 @@ class OrdersAdapter(
             } else "Pedido às --:--"
         } catch (_: Exception) {
             "Pedido às --:--"
+        }
+    }
+
+    private fun formatAppointmentTime(isoDate: String): String {
+        return try {
+            val normalized = if (isoDate.length >= 19) isoDate.substring(0, 19) else isoDate
+            val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.ROOT).apply {
+                timeZone = if (isoDate.endsWith("Z")) TimeZone.getTimeZone("UTC") else TimeZone.getDefault()
+            }
+            val parsed = parser.parse(normalized)
+            if (parsed != null) "Horário: ${timeFormat.format(parsed)}" else "Horário: --:--"
+        } catch (_: Exception) {
+            "Horário: --:--"
         }
     }
 

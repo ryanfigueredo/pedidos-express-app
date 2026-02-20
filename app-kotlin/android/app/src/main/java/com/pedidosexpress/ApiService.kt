@@ -24,6 +24,9 @@ data class User(
     val isDentista: Boolean
         get() = businessType == "DENTISTA"
     
+    val isBarbeiro: Boolean
+        get() = businessType == "BARBEIRO"
+    
     val isRestaurante: Boolean
         get() = businessType == "RESTAURANTE" || businessType == null
 }
@@ -39,6 +42,7 @@ data class Order(
     @SerializedName("display_id") val displayId: String? = null,
     @SerializedName("daily_sequence") val dailySequence: Int? = null,
     @SerializedName("order_type") val orderType: String? = null,
+    @SerializedName("appointment_date") val appointmentDate: String? = null,
     @SerializedName("delivery_address") val deliveryAddress: String? = null,
     @SerializedName("payment_method") val paymentMethod: String? = null,
     val subtotal: Double? = null,
@@ -261,6 +265,7 @@ class ApiService(private val context: android.content.Context) {
                     displayId = order["display_id"]?.toString(),
                     dailySequence = (order["daily_sequence"] as? Double)?.toInt(),
                     orderType = order["order_type"]?.toString(),
+                    appointmentDate = order["appointment_date"]?.toString(),
                     deliveryAddress = order["delivery_address"]?.toString(),
                     paymentMethod = order["payment_method"]?.toString(),
                     subtotal = (order["subtotal"] as? Double),

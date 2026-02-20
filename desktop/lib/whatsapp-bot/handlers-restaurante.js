@@ -3043,7 +3043,8 @@ function isRestauranteConfig(config) {
   return !!(
     config &&
     (config.tenant_slug || config.tenant_api_key) &&
-    config.desktop_api_url
+    config.desktop_api_url &&
+    config.business_type !== "BARBEIRO"
   );
 }
 

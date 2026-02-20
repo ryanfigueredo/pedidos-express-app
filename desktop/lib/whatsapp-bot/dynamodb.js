@@ -84,6 +84,7 @@ async function getClientConfig(phoneNumberId) {
         item.desktop_api_url ||
         process.env.DESKTOP_API_URL ||
         "https://pedidos-express-api.vercel.app",
+      business_type: item.business_type || "RESTAURANTE",
     };
   } catch (error) {
     console.error("[DynamoDB] Erro ao buscar configuração:", error.message);
@@ -134,6 +135,7 @@ async function getClientConfigByBusinessAccountId(
         item.desktop_api_url ||
         process.env.DESKTOP_API_URL ||
         "https://pedidos-express-api.vercel.app",
+      business_type: item.business_type || "RESTAURANTE",
     };
   } catch (error) {
     console.error(

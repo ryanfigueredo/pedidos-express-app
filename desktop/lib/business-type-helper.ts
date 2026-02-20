@@ -14,7 +14,8 @@ export function getLabel(
   if (!user || !user.business_type) {
     return defaultLabel;
   }
-  return user.business_type === "DENTISTA" ? dentistaLabel : defaultLabel;
+  const useAgendaLabel = user.business_type === "DENTISTA" || user.business_type === "BARBEIRO";
+  return useAgendaLabel ? dentistaLabel : defaultLabel;
 }
 
 // Labels principais

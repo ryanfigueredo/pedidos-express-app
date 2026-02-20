@@ -27,6 +27,10 @@ struct User: Codable {
         return businessType == "DENTISTA"
     }
     
+    var isBarbeiro: Bool {
+        return businessType == "BARBEIRO"
+    }
+    
     var isRestaurante: Bool {
         return businessType == "RESTAURANTE" || businessType == nil
     }

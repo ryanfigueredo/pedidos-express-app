@@ -8,7 +8,8 @@ class BusinessTypeHelper {
         guard let user = user else {
             return defaultLabel
         }
-        return user.isDentista ? dentistaLabel : defaultLabel
+        let useAgendaLabel = user.isDentista || user.isBarbeiro
+        return useAgendaLabel ? dentistaLabel : defaultLabel
     }
     
     // Labels principais

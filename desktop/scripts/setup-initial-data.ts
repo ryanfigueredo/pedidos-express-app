@@ -108,6 +108,48 @@ async function setupInitialData() {
     console.log('   Usuário: admin@tamboril.com')
     console.log('   Senha: 123456\n')
 
+    // 5. Tenant Barbeiro + usuário gui@barber.com.br (login no app)
+    console.log('✂️ Criando tenant Barbeiro e usuário gui@barber.com.br...')
+    const barberApiKey = await generateApiKey()
+    const tenantBarber = await prisma.tenant.upsert({
+      where: { slug: 'barbearia-demo' },
+      update: { business_type: 'BARBEIRO' },
+      create: {
+        name: 'Barbearia Demo',
+        slug: 'barbearia-demo',
+        api_key: barberApiKey,
+        is_active: true,
+        business_type: 'BARBEIRO',
+      },
+    })
+    console.log(`✅ Tenant barbeiro: ${tenantBarber.name} (${tenantBarber.slug})`)
+    const barberUserPassword = await hashPassword('123456')
+    const barberUser = await prisma.user.upsert({
+      where: {
+        tenant_id_username: {
+          tenant_id: tenantBarber.id,
+          username: 'gui@barber.com.br',
+        },
+      },
+      update: { password: barberUserPassword, name: 'Gui Barbeiro' },
+      create: {
+        tenant_id: tenantBarber.id,
+        username: 'gui@barber.com.br',
+        password: barberUserPassword,
+        name: 'Gui Barbeiro',
+        role: 'admin',
+      },
+    })
+    console.log(`✅ Usuário barbeiro: ${barberUser.username}`)
+    console.log('   Senha: 123456')
+    console.log('   (Login no app: gui@barber.com.br / 123456)\n')
+    console.log('✂️ BARBEIRO (App + WhatsApp):')
+    console.log(`   Tenant ID: ${tenantBarber.id}`)
+    console.log(`   Slug: ${tenantBarber.slug}`)
+    console.log(`   API Key: ${tenantBarber.api_key}`)
+    console.log('   Usuário: gui@barber.com.br')
+    console.log('   Senha: 123456\n')
+
   } catch (error) {
     console.error('❌ Erro ao configurar dados:', error)
     throw error
