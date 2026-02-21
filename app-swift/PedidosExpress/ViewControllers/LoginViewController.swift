@@ -5,7 +5,6 @@ class LoginViewController: UIViewController {
     // MARK: - Subviews
     private var scrollView: UIScrollView!
     private var contentView: UIView!
-    private var orbContainer: UIView!
     private var logoImageView: UIImageView!
     private var usernameTextField: UITextField!
     private var passwordTextField: UITextField!
@@ -42,78 +41,14 @@ class LoginViewController: UIViewController {
         unregisterKeyboardNotifications()
     }
 
-    override var preferredStatusBarStyle: UIStatusBarStyle { .lightContent }
+    override var preferredStatusBarStyle: UIStatusBarStyle { .default }
 
     deinit {
         unregisterKeyboardNotifications()
     }
 
-    // MARK: - Dark Modern Glass Background (#0D0D0D + orbes com névoa)
-    private var orbViews: [UIView] = []
-
-    private func setupDarkGlassBackground() {
-        orbContainer = UIView()
-        orbContainer.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(orbContainer)
-
-        // Orbe roxo/lilás topo esquerdo
-        let orb1 = makeOrbView(color: .loginOrbPurple, size: 280)
-        orbContainer.addSubview(orb1)
-        orbViews.append(orb1)
-
-        // Orbe azul profundo centro/direita
-        let orb2 = makeOrbView(color: .loginOrbBlue, size: 320)
-        orbContainer.addSubview(orb2)
-        orbViews.append(orb2)
-
-        // Orbe menor azul (opcional)
-        let orb3 = makeOrbView(color: .loginOrbBlue.withAlphaComponent(0.7), size: 200)
-        orbContainer.addSubview(orb3)
-        orbViews.append(orb3)
-
-        NSLayoutConstraint.activate([
-            orbContainer.topAnchor.constraint(equalTo: view.topAnchor),
-            orbContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            orbContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            orbContainer.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-        ])
-    }
-
-    /// Orbe de luz: círculo com cor e opacidade reduzida (efeito névoa luminosa). Sem borda.
-    private func makeOrbView(color: UIColor, size: CGFloat) -> UIView {
-        let v = UIView()
-        v.translatesAutoresizingMaskIntoConstraints = false
-        v.layer.cornerRadius = size / 2
-        v.clipsToBounds = true
-        v.backgroundColor = color
-        v.alpha = 0.5
-        NSLayoutConstraint.activate([
-            v.widthAnchor.constraint(equalToConstant: size),
-            v.heightAnchor.constraint(equalToConstant: size),
-        ])
-        return v
-    }
-
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        let w = orbContainer.bounds.width
-        let h = orbContainer.bounds.height
-        let positions: [(CGFloat, CGFloat)] = [
-            (w * 0.15, h * 0.12),
-            (w * 0.82, h * 0.45),
-            (w * 0.6, h * 0.78),
-        ]
-        let sizes: [CGFloat] = [280, 320, 200]
-        for (idx, orb) in orbViews.enumerated() where idx < positions.count && idx < sizes.count {
-            let (cx, cy) = positions[idx]
-            let s = sizes[idx]
-            orb.frame = CGRect(x: cx - s / 2, y: cy - s / 2, width: s, height: s)
-        }
-    }
-
     private func setupUI() {
-        view.backgroundColor = .loginBackgroundDark
-        setupDarkGlassBackground()
+        view.backgroundColor = UIColor(red: 249/255, green: 249/255, blue: 249/255, alpha: 1) // #F9F9F9 off-white
 
         scrollView = UIScrollView()
         scrollView.translatesAutoresizingMaskIntoConstraints = false
@@ -125,28 +60,27 @@ class LoginViewController: UIViewController {
         contentView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.addSubview(contentView)
 
-        // Logo DMTN centralizada (branca)
+        // Logo DMTN centralizada (preta para contraste em fundo claro)
         logoImageView = UIImageView(image: UIImage(named: "DMTNLogo"))
         logoImageView.contentMode = .scaleAspectFit
-        logoImageView.tintColor = .white
+        logoImageView.tintColor = .black
         logoImageView.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(logoImageView)
 
-        // Campos com fundo translúcido
-        usernameTextField = makeGlassTextField(placeholder: "Usuário")
+        usernameTextField = makeModernTextField(placeholder: "Usuário")
         usernameTextField.autocapitalizationType = .none
         usernameTextField.autocorrectionType = .no
         usernameTextField.returnKeyType = .next
         usernameTextField.delegate = self
         contentView.addSubview(usernameTextField)
 
-        passwordTextField = makeGlassTextField(placeholder: "Senha")
+        passwordTextField = makeModernTextField(placeholder: "Senha")
         passwordTextField.isSecureTextEntry = true
         passwordTextField.returnKeyType = .go
         passwordTextField.delegate = self
         passwordToggleButton = UIButton(type: .system)
         passwordToggleButton.setImage(UIImage(systemName: "eye.slash"), for: .normal)
-        passwordToggleButton.tintColor = .white
+        passwordToggleButton.tintColor = .darkGray
         passwordToggleButton.addTarget(self, action: #selector(togglePasswordVisibility), for: .touchUpInside)
         passwordToggleButton.frame = CGRect(x: 0, y: 0, width: 44, height: 44)
         passwordTextField.rightView = passwordToggleButton
@@ -155,7 +89,7 @@ class LoginViewController: UIViewController {
 
         forgotPasswordButton = UIButton(type: .system)
         forgotPasswordButton.setTitle("Esqueci minha senha", for: .normal)
-        forgotPasswordButton.setTitleColor(.loginForgotLilac, for: .normal)
+        forgotPasswordButton.setTitleColor(.systemBlue, for: .normal)
         forgotPasswordButton.titleLabel?.font = .systemFont(ofSize: 14, weight: .medium)
         forgotPasswordButton.addTarget(self, action: #selector(forgotPasswordTapped), for: .touchUpInside)
         forgotPasswordButton.translatesAutoresizingMaskIntoConstraints = false
@@ -164,13 +98,13 @@ class LoginViewController: UIViewController {
         savePasswordLabel = UILabel()
         savePasswordLabel.text = "Salvar senha"
         savePasswordLabel.font = .systemFont(ofSize: 16)
-        savePasswordLabel.textColor = .white
+        savePasswordLabel.textColor = .black
         savePasswordLabel.translatesAutoresizingMaskIntoConstraints = false
 
         savePasswordSwitch = UISwitch()
-        savePasswordSwitch.onTintColor = .loginRoyalBlue
+        savePasswordSwitch.onTintColor = .black
         savePasswordSwitch.thumbTintColor = .white
-        savePasswordSwitch.isOn = true
+        savePasswordSwitch.isOn = false
         savePasswordSwitch.translatesAutoresizingMaskIntoConstraints = false
 
         let savePasswordStack = UIStackView(arrangedSubviews: [savePasswordLabel, savePasswordSwitch])
@@ -183,15 +117,15 @@ class LoginViewController: UIViewController {
         loginButton = UIButton(type: .system)
         loginButton.setTitle("Entrar", for: .normal)
         loginButton.setTitleColor(.white, for: .normal)
-        loginButton.titleLabel?.font = .systemFont(ofSize: 17, weight: .bold)
-        loginButton.backgroundColor = .loginRoyalBlue
-        loginButton.layer.cornerRadius = 15
+        loginButton.titleLabel?.font = .systemFont(ofSize: 17, weight: .semibold)
+        loginButton.backgroundColor = .black
+        loginButton.layer.cornerRadius = 12
         loginButton.addTarget(self, action: #selector(loginButtonTapped), for: .touchUpInside)
         loginButton.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(loginButton)
 
         progressIndicator = UIActivityIndicatorView(style: .medium)
-        progressIndicator.color = .white
+        progressIndicator.color = .black
         progressIndicator.hidesWhenStopped = true
         progressIndicator.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(progressIndicator)
@@ -245,21 +179,27 @@ class LoginViewController: UIViewController {
         ])
     }
 
-    private func makeGlassTextField(placeholder: String) -> UITextField {
+    private func makeModernTextField(placeholder: String) -> UITextField {
         let tf = UITextField()
         tf.placeholder = placeholder
         tf.borderStyle = .none
-        tf.backgroundColor = .loginInputDark
-        tf.textColor = .white
+        tf.backgroundColor = .white
+        tf.textColor = .black
         tf.font = .systemFont(ofSize: 16)
         tf.translatesAutoresizingMaskIntoConstraints = false
         tf.layer.cornerRadius = 12
-        tf.clipsToBounds = true
+        tf.layer.borderWidth = 1
+        tf.layer.borderColor = UIColor(red: 0.9, green: 0.9, blue: 0.92, alpha: 1).cgColor
+        tf.layer.shadowColor = UIColor.black.cgColor
+        tf.layer.shadowOffset = CGSize(width: 0, height: 1)
+        tf.layer.shadowRadius = 2
+        tf.layer.shadowOpacity = 0.06
+        tf.clipsToBounds = false
         tf.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 16, height: 20))
         tf.leftViewMode = .always
         tf.attributedPlaceholder = NSAttributedString(
             string: placeholder,
-            attributes: [.foregroundColor: UIColor.white.withAlphaComponent(0.5)]
+            attributes: [.foregroundColor: UIColor.darkGray.withAlphaComponent(0.7)]
         )
         return tf
     }
@@ -287,6 +227,8 @@ class LoginViewController: UIViewController {
             passwordTextField.text = credentials.password
             savePasswordSwitch.isOn = true
         } else {
+            usernameTextField.text = nil
+            passwordTextField.text = nil
             savePasswordSwitch.isOn = false
         }
     }
@@ -350,9 +292,10 @@ class LoginViewController: UIViewController {
             do {
                 let user = try await apiService.login(username: username, password: password)
                 await MainActor.run {
-                    authService.saveUser(user, username: username, password: password)
-                    if !self.savePasswordSwitch.isOn {
-                        authService.saveUserWithoutPassword(user, username: username)
+                    if self.savePasswordSwitch.isOn {
+                        authService.saveUser(user, username: username, password: password)
+                    } else {
+                        authService.saveUserWithoutPassword(user, username: username, passwordForSession: password)
                     }
                     progressIndicator.stopAnimating()
                     loginButton.isEnabled = true

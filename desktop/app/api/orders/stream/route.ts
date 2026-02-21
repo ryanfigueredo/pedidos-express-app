@@ -1,15 +1,15 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getSession } from '@/lib/auth-session'
+import { getTenantIdFromRequest } from '@/lib/tenant-from-request'
 
 /**
- * Server-Sent Events (SSE) para atualização em tempo real de pedidos
- * Substitui o polling, reduzindo carga no servidor
+ * Server-Sent Events (SSE) para atualização em tempo real de pedidos.
+ * Multi-tenancy: retorna APENAS pedidos do tenant do usuário autenticado (sessão ou Basic Auth).
+ * NUNCA envia pedidos de outro tenant.
  */
 export async function GET(request: NextRequest) {
-  // Verificar autenticação
-  const session = await getSession()
-  if (!session) {
+  const tenantId = await getTenantIdFromRequest(request)
+  if (!tenantId) {
     return new Response('Unauthorized', { status: 401 })
   }
 
@@ -21,26 +21,23 @@ export async function GET(request: NextRequest) {
         controller.enqueue(encoder.encode(message))
       }
 
-      // Enviar dados iniciais
-      try {
-        const orders = await prisma.order.findMany({
+      const fetchOrders = () =>
+        prisma.order.findMany({
+          where: { tenant_id: tenantId },
           orderBy: { created_at: 'desc' },
           take: 20,
         })
 
+      try {
+        const orders = await fetchOrders()
         send({ type: 'initial', orders })
       } catch (error) {
         send({ type: 'error', message: 'Erro ao carregar pedidos' })
       }
 
-      // Polling otimizado (a cada 5 segundos)
       const interval = setInterval(async () => {
         try {
-          const orders = await prisma.order.findMany({
-            orderBy: { created_at: 'desc' },
-            take: 20,
-          })
-
+          const orders = await fetchOrders()
           send({ type: 'update', orders, timestamp: Date.now() })
         } catch (error) {
           console.error('Erro no SSE:', error)

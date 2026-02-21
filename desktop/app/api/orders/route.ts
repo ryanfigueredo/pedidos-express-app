@@ -2,137 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getStoreStatus } from "@/lib/store-status";
 import { Prisma } from "@prisma/client";
+import { getTenantIdFromRequest } from "@/lib/tenant-from-request";
 
 // Forçar rota dinâmica (não pode ser renderizada estaticamente)
 export const dynamic = "force-dynamic";
-
-/** Lê sessão do cookie da requisição (fallback quando next/headers não reflete o request). */
-function getSessionFromCookieHeader(cookieHeader: string | null): { id: string; tenant_id?: string | null } | null {
-  if (!cookieHeader) return null;
-  try {
-    const match = cookieHeader.match(/\bsession=([^;]+)/);
-    let value = match?.[1]?.trim();
-    if (!value) return null;
-    if (value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1).replace(/\\"/g, '"');
-    const decoded = decodeURIComponent(value);
-    const parsed = JSON.parse(decoded) as { id?: string; tenant_id?: string | null };
-    return parsed?.id ? { id: parsed.id, tenant_id: parsed.tenant_id } : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Obtém tenant_id a partir da sessão (web), headers (Basic Auth, X-Tenant-Id, X-API-Key). Usado por GET e POST. */
-async function getTenantIdFromRequest(
-  request: NextRequest
-): Promise<string | null> {
-  let tenantId: string | null = null;
-
-  // 1) Sessão (cookie) – dashboard web logado vê só pedidos do seu tenant
-  // Ler do header Cookie diretamente para garantir que usamos o request que chegou (evita bug em edge/worker)
-  const cookieHeader = request.headers.get("cookie");
-  let session: { id: string; tenant_id?: string | null } | null = getSessionFromCookieHeader(cookieHeader);
-  if (!session) {
-    try {
-      const { getSession } = await import("@/lib/auth-session");
-      session = await getSession();
-    } catch (_) {}
-  }
-  if (session?.id) {
-    if (session.tenant_id) {
-      return session.tenant_id;
-    }
-    // Cookie antigo pode não ter tenant_id: buscar no banco
-    const user = await prisma.user.findUnique({
-      where: { id: session.id },
-      select: { tenant_id: true },
-    });
-    if (user?.tenant_id) {
-      return user.tenant_id;
-    }
-    // Super admin sem tenant: não usar fallback aqui
-  }
-
-  const authHeader =
-    request.headers.get("authorization") ||
-    request.headers.get("Authorization");
-  if (authHeader?.startsWith("Basic ")) {
-    try {
-      const base64Credentials = authHeader.split(" ")[1];
-      const credentials = Buffer.from(base64Credentials, "base64").toString(
-        "utf-8"
-      );
-      const [username, password] = credentials.split(":");
-      if (username && password) {
-        const { verifyCredentials } = await import("@/lib/auth-session");
-        const user = await verifyCredentials(username, password);
-        if (user?.tenant_id) tenantId = user.tenant_id;
-        else if (user) {
-          const users = await prisma.$queryRawUnsafe<
-            Array<{ tenant_id: string | null }>
-          >(`SELECT tenant_id FROM users WHERE id = $1 LIMIT 1`, user.id);
-          if (users.length > 0 && users[0].tenant_id)
-            tenantId = users[0].tenant_id;
-          else {
-            const slug =
-              request.headers.get("x-tenant-id") || "tamboril-burguer";
-            const tenants = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
-              `SELECT id FROM tenants WHERE slug = $1 LIMIT 1`,
-              slug
-            );
-            if (tenants.length > 0) tenantId = tenants[0].id;
-          }
-        }
-      }
-    } catch (_) {}
-  }
-  if (!tenantId) {
-    const tenantIdHeader =
-      request.headers.get("x-tenant-id") ||
-      request.headers.get("X-Tenant-Id");
-    if (tenantIdHeader) {
-      if (
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-          tenantIdHeader
-        )
-      ) {
-        tenantId = tenantIdHeader;
-      } else {
-        try {
-          const { getTenantByApiKey } = await import("@/lib/tenant");
-          const tenant = await getTenantByApiKey(tenantIdHeader);
-          if (tenant) tenantId = tenant.id;
-          else {
-            const tenants = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
-              `SELECT id FROM tenants WHERE slug = $1 LIMIT 1`,
-              tenantIdHeader
-            );
-            if (tenants.length > 0) tenantId = tenants[0].id;
-          }
-        } catch (_) {}
-      }
-    } else {
-      const apiKey =
-        request.headers.get("x-api-key") || request.headers.get("X-API-Key");
-      if (apiKey) {
-        try {
-          const { getTenantByApiKey } = await import("@/lib/tenant");
-          const tenant = await getTenantByApiKey(apiKey);
-          if (tenant) tenantId = tenant.id;
-        } catch (_) {}
-      }
-    }
-  }
-  if (!tenantId) {
-    try {
-      const defaultTenants = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
-        `SELECT id FROM tenants WHERE slug = 'tamboril-burguer' LIMIT 1`
-      );
-      if (defaultTenants.length > 0) tenantId = defaultTenants[0].id;
-    } catch (_) {}
-  }
-  return tenantId;
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -171,150 +44,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Obter tenant_id do header, API key ou Basic Auth
-    let tenantId: string | null = null;
+    // Obter tenant_id APENAS do usuário autenticado (sessão/Basic Auth) ou header/API key explícitos. NUNCA fallback para outro tenant.
+    const tenantId = await getTenantIdFromRequest(request);
 
-    // Verificar Basic Auth primeiro (para apps mobile com login)
-    const authHeader =
-      request.headers.get("authorization") ||
-      request.headers.get("Authorization");
-    if (authHeader && authHeader.startsWith("Basic ")) {
-      try {
-        const base64Credentials = authHeader.split(" ")[1];
-        const credentials = Buffer.from(base64Credentials, "base64").toString(
-          "utf-8"
-        );
-        const [username, password] = credentials.split(":");
-
-        if (username && password) {
-          const { verifyCredentials } = await import("@/lib/auth-session");
-          const user = await verifyCredentials(username, password);
-          if (user) {
-            console.log(
-              "✅ Usuário autenticado via Basic Auth:",
-              user.id,
-              "tenant_id:",
-              user.tenant_id
-            );
-            // Usar tenant_id do user retornado (já vem do verifyCredentials)
-            if (user.tenant_id) {
-              tenantId = user.tenant_id;
-            } else {
-              // Se não tem no user, buscar do banco usando SQL direto (fallback)
-              try {
-                const users = await prisma.$queryRawUnsafe<
-                  Array<{ tenant_id: string | null }>
-                >(
-                  `
-                  SELECT tenant_id FROM users WHERE id = $1 LIMIT 1
-                `,
-                  user.id
-                );
-                if (users.length > 0 && users[0].tenant_id) {
-                  tenantId = users[0].tenant_id;
-                  console.log("✅ Tenant_id obtido do banco:", tenantId);
-                }
-              } catch (dbError: any) {
-                console.error("Erro ao buscar tenant_id do usuário:", dbError);
-                // Se der erro P2022, tentar buscar sem tenant_id (pode não existir a coluna ainda)
-                if (dbError?.code === "P2022") {
-                  console.log(
-                    "⚠️  Coluna tenant_id não existe, tentando buscar tenant pelo slug..."
-                  );
-                  // Buscar tenant pelo slug do app
-                  const tenantSlug =
-                    request.headers.get("x-tenant-id") || "tamboril-burguer";
-                  try {
-                    const tenants = await prisma.$queryRawUnsafe<
-                      Array<{ id: string }>
-                    >(
-                      `
-                      SELECT id FROM tenants WHERE slug = $1 LIMIT 1
-                    `,
-                      tenantSlug
-                    );
-                    if (tenants.length > 0) {
-                      tenantId = tenants[0].id;
-                      console.log("✅ Tenant_id obtido pelo slug:", tenantId);
-                    }
-                  } catch (tenantError) {
-                    console.error(
-                      "Erro ao buscar tenant pelo slug:",
-                      tenantError
-                    );
-                  }
-                }
-              }
-            }
-          } else {
-            console.log("❌ Credenciais inválidas no Basic Auth");
-          }
-        }
-      } catch (error) {
-        console.error("Erro ao processar Basic Auth:", error);
-        // Ignorar erro de parsing
-      }
-    }
-
-    // Se não conseguiu pelo Basic Auth, tentar header ou API key
+    // NUNCA retornar dados de outro tenant: se não identificou o tenant, retornar 403
     if (!tenantId) {
-      const tenantIdHeader =
-        request.headers.get("x-tenant-id") ||
-        request.headers.get("X-Tenant-Id");
-      if (tenantIdHeader) {
-        // Se for um UUID, usar diretamente. Se for slug, buscar o ID
-        if (
-          tenantIdHeader.match(
-            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-          )
-        ) {
-          tenantId = tenantIdHeader;
-        } else {
-          // É um slug, buscar o ID do tenant
-          try {
-            const { getTenantByApiKey } = await import("@/lib/tenant");
-            const tenant = await getTenantByApiKey(tenantIdHeader);
-            if (tenant) {
-              tenantId = tenant.id;
-            } else {
-              // Tentar buscar pelo slug diretamente
-              const tenants = await prisma.$queryRawUnsafe<
-                Array<{ id: string }>
-              >(
-                `
-                SELECT id FROM tenants WHERE slug = $1 LIMIT 1
-              `,
-                tenantIdHeader
-              );
-              if (tenants.length > 0) {
-                tenantId = tenants[0].id;
-              }
-            }
-          } catch (error) {
-            console.error("Erro ao buscar tenant pelo header:", error);
-          }
-        }
-      } else {
-        // Tentar obter pela API key
-        const apiKey =
-          request.headers.get("x-api-key") || request.headers.get("X-API-Key");
-        if (apiKey) {
-          try {
-            const { getTenantByApiKey } = await import("@/lib/tenant");
-            const tenant = await getTenantByApiKey(apiKey);
-            if (tenant) {
-              tenantId = tenant.id;
-            }
-          } catch (error) {
-            console.error("Erro ao buscar tenant pela API key:", error);
-          }
-        }
-      }
-    }
-
-    // Último fallback: usar tenant padrão se não conseguir identificar
-    if (!tenantId) {
-      console.error("❌ Tenant não identificado. Headers:", {
+      console.error("❌ Tenant não identificado (multi-tenancy). Headers:", {
         "x-tenant-id": request.headers.get("x-tenant-id"),
         "X-Tenant-Id": request.headers.get("X-Tenant-Id"),
         "x-api-key": request.headers.get("x-api-key") ? "presente" : "ausente",
@@ -322,58 +57,21 @@ export async function GET(request: NextRequest) {
           ? "presente"
           : "ausente",
       });
-
-      // Tentar buscar tenant padrão (tamboril-burguer) como último recurso
-      try {
-        const defaultTenants = await prisma.$queryRawUnsafe<
-          Array<{ id: string }>
-        >(`
-          SELECT id FROM tenants WHERE slug = 'tamboril-burguer' LIMIT 1
-        `);
-        if (defaultTenants.length > 0) {
-          tenantId = defaultTenants[0].id;
-          console.log(
-            "⚠️  Usando tenant padrão (tamboril-burguer) como fallback:",
-            tenantId
-          );
-        } else {
-          return NextResponse.json(
-            {
-              message:
-                "Tenant não identificado. Forneça X-Tenant-Id no header, X-API-Key válida ou Basic Auth.",
-            },
-            { status: 400 }
-          );
-        }
-      } catch (fallbackError: any) {
-        // Se der erro, retornar lista vazia em vez de erro 500
-        if (
-          fallbackError?.code === "P2022" ||
-          fallbackError?.code === "P2021"
-        ) {
-          console.log("⚠️  Tabela tenants não existe, retornando lista vazia");
-          return NextResponse.json(
-            {
-              orders: [],
-              pagination: {
-                page: 1,
-                limit: 20,
-                total: 0,
-                totalPages: 0,
-                hasMore: false,
-              },
-            },
-            { status: 200 }
-          );
-        }
-        return NextResponse.json(
-          {
-            message:
-              "Tenant não identificado. Forneça X-Tenant-Id no header, X-API-Key válida ou Basic Auth.",
+      return NextResponse.json(
+        {
+          message:
+            "Tenant não identificado. Autentique-se com um usuário associado a um tenant ou forneça X-Tenant-Id/X-API-Key do seu tenant.",
+          orders: [],
+          pagination: {
+            page: 1,
+            limit: 20,
+            total: 0,
+            totalPages: 0,
+            hasMore: false,
           },
-          { status: 400 }
-        );
-      }
+        },
+        { status: 403 }
+      );
     }
 
     console.log("✅ Tenant identificado:", tenantId);

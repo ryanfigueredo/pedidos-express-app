@@ -23,16 +23,14 @@ class ApiService {
     
     private func getAuthHeader() -> String? {
         guard let credentials = authService.getCredentials() else {
-            print("⚠️ ApiService: getAuthHeader() - Sem credenciais salvas")
+            #if DEBUG
+            print("⚠️ ApiService: Sem credenciais (login não realizado ou senha não salva)")
+            #endif
             return nil
         }
         let credentialsString = "\(credentials.username):\(credentials.password)"
-        guard let credentialsData = credentialsString.data(using: .utf8) else {
-            print("⚠️ ApiService: getAuthHeader() - Erro ao converter credenciais para Data")
-            return nil
-        }
+        guard let credentialsData = credentialsString.data(using: .utf8) else { return nil }
         let encoded = credentialsData.base64EncodedString()
-        print("✅ ApiService: getAuthHeader() - Credenciais encontradas para usuário: \(credentials.username)")
         return "Basic \(encoded)"
     }
     
@@ -51,11 +49,7 @@ class ApiService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 30.0 // 30 segundos de timeout
         
-        // Basic Auth é obrigatório - o backend identifica o tenant pelo usuário autenticado
-        guard let authHeader = getAuthHeader() else {
-            print("⚠️ ApiService: Sem credenciais para Basic Auth")
-            return nil
-        }
+        guard let authHeader = getAuthHeader() else { return nil }
         request.setValue(authHeader, forHTTPHeaderField: "Authorization")
         
         // X-User-Id opcional (pode ajudar em logs)
@@ -67,16 +61,9 @@ class ApiService {
             request.httpBody = body
         }
         
+        #if DEBUG
         print("🌐 ApiService: \(method) \(url)")
-        if let userId = getUserId() {
-            print("   User ID: \(userId)")
-        }
-        if let authHeader = getAuthHeader() {
-            print("   Auth Header presente: \(authHeader.prefix(20))...")
-        } else {
-            print("   ⚠️ Auth Header AUSENTE!")
-        }
-        
+        #endif
         return request
     }
     

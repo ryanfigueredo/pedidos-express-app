@@ -23,18 +23,26 @@ final class ScheduleViewController: UIViewController {
 
     private var dateHeaderContainer: UIView!
     private var dateLabel: UILabel!
-    private var timelineTableView: UITableView!
+    private var timelineScrollView: UIScrollView!
+    private var timelineContentStack: UIStackView!
+    private var timeRulerView: UIView!
+    private var dayColumnView: UIView!
     private var refreshControl: UIRefreshControl!
     private var currentTimeLineView: UIView!
     private var currentTimeLineTopConstraint: NSLayoutConstraint?
     private var progressIndicator: UIActivityIndicatorView!
     private var emptyStateView: UIView!
 
-    private static let slotHeight: CGFloat = 72
+    /// Timeline estilo Google Agenda: altura por hora e duração padrão do bloco
     private static let dateHeaderHeight: CGFloat = 56
     private static let startHour = 8
     private static let endHour = 20
-    private static let slotCount: Int = (endHour - startHour) * 2
+    private static let pointsPerHour: CGFloat = 60
+    private static let defaultDurationMinutes: Int = 30
+    private static let timeRulerWidth: CGFloat = 56
+    private static var timelineContentHeight: CGFloat {
+        CGFloat(endHour - startHour) * pointsPerHour
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -61,9 +69,9 @@ final class ScheduleViewController: UIViewController {
         nav?.compactAppearance = appearance
 
         setupDateHeader()
+        setupEmptyState()
         setupTimeline()
         setupCurrentTimeLine()
-        setupEmptyState()
         updateDateLabel()
         if BusinessProvider.isBarber {
             navigationItem.rightBarButtonItem = UIBarButtonItem(
@@ -122,7 +130,7 @@ final class ScheduleViewController: UIViewController {
                     updateDateLabel()
                     filterAppointmentsForSelectedDay()
                     updateEmptyState()
-                    timelineTableView.reloadData()
+                    updateTimelineBlocks()
                     loadOrders()
                     showMessage("Agendamento adicionado.") { [weak self] in
                         self?.loadOrders(for: chosenDate)
@@ -227,7 +235,7 @@ final class ScheduleViewController: UIViewController {
         updateDateLabel()
         filterAppointmentsForSelectedDay()
         updateEmptyState()
-        timelineTableView.reloadData()
+        updateTimelineBlocks()
         loadOrders()
     }
 
@@ -237,7 +245,7 @@ final class ScheduleViewController: UIViewController {
         updateDateLabel()
         filterAppointmentsForSelectedDay()
         updateEmptyState()
-        timelineTableView.reloadData()
+        updateTimelineBlocks()
         loadOrders()
     }
 
@@ -270,26 +278,41 @@ final class ScheduleViewController: UIViewController {
     }
 
     private func updateEmptyState() {
-        timelineTableView.backgroundView = appointmentsForSelectedDay.isEmpty ? emptyStateView : nil
+        let isEmpty = appointmentsForSelectedDay.isEmpty
+        emptyStateView.isHidden = !isEmpty
+        if !isEmpty { return }
+        timelineScrollView.bringSubviewToFront(emptyStateView)
     }
 
     private func setupTimeline() {
-        timelineTableView = UITableView(frame: .zero, style: .plain)
-        timelineTableView.backgroundColor = .scheduleBackground
-        timelineTableView.separatorColor = .scheduleSeparator
-        timelineTableView.separatorInset = UIEdgeInsets(top: 0, left: 16, bottom: 0, right: 16)
-        timelineTableView.delegate = self
-        timelineTableView.dataSource = self
-        timelineTableView.register(ScheduleTimeCell.self, forCellReuseIdentifier: ScheduleTimeCell.reuseId)
-        timelineTableView.rowHeight = Self.slotHeight
-        timelineTableView.translatesAutoresizingMaskIntoConstraints = false
-        timelineTableView.contentInset = UIEdgeInsets(top: 8, left: 0, bottom: 24, right: 0)
-        view.addSubview(timelineTableView)
+        timelineScrollView = UIScrollView()
+        timelineScrollView.translatesAutoresizingMaskIntoConstraints = false
+        timelineScrollView.backgroundColor = .scheduleBackground
+        timelineScrollView.showsVerticalScrollIndicator = true
+        timelineScrollView.alwaysBounceVertical = true
+        view.addSubview(timelineScrollView)
 
         refreshControl = UIRefreshControl()
         refreshControl.tintColor = .barberPrimary
         refreshControl.addTarget(self, action: #selector(refreshSchedule), for: .valueChanged)
-        timelineTableView.refreshControl = refreshControl
+        timelineScrollView.refreshControl = refreshControl
+
+        let contentView = UIView()
+        contentView.translatesAutoresizingMaskIntoConstraints = false
+        contentView.backgroundColor = .scheduleBackground
+        timelineScrollView.addSubview(contentView)
+
+        timeRulerView = UIView()
+        timeRulerView.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(timeRulerView)
+
+        dayColumnView = UIView()
+        dayColumnView.translatesAutoresizingMaskIntoConstraints = false
+        dayColumnView.backgroundColor = .scheduleBackground
+        contentView.addSubview(dayColumnView)
+
+        buildTimeRulerLabels()
+        buildHourGridLines()
 
         progressIndicator = UIActivityIndicatorView(style: .large)
         progressIndicator.color = .barberPrimary
@@ -297,14 +320,118 @@ final class ScheduleViewController: UIViewController {
         progressIndicator.hidesWhenStopped = true
         view.addSubview(progressIndicator)
 
+        if let empty = emptyStateView {
+            empty.isHidden = true
+            timelineScrollView.addSubview(empty)
+            empty.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                empty.centerXAnchor.constraint(equalTo: timelineScrollView.centerXAnchor),
+                empty.centerYAnchor.constraint(equalTo: timelineScrollView.centerYAnchor, constant: 40),
+                empty.leadingAnchor.constraint(greaterThanOrEqualTo: timelineScrollView.leadingAnchor, constant: 24),
+                timelineScrollView.trailingAnchor.constraint(greaterThanOrEqualTo: empty.trailingAnchor, constant: 24),
+            ])
+        }
+
         NSLayoutConstraint.activate([
-            timelineTableView.topAnchor.constraint(equalTo: dateHeaderContainer.bottomAnchor, constant: 8),
-            timelineTableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            timelineTableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            timelineTableView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            timelineScrollView.topAnchor.constraint(equalTo: dateHeaderContainer.bottomAnchor, constant: 8),
+            timelineScrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            timelineScrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            timelineScrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            contentView.topAnchor.constraint(equalTo: timelineScrollView.contentLayoutGuide.topAnchor),
+            contentView.leadingAnchor.constraint(equalTo: timelineScrollView.contentLayoutGuide.leadingAnchor),
+            contentView.trailingAnchor.constraint(equalTo: timelineScrollView.contentLayoutGuide.trailingAnchor),
+            contentView.bottomAnchor.constraint(equalTo: timelineScrollView.contentLayoutGuide.bottomAnchor),
+            contentView.widthAnchor.constraint(equalTo: timelineScrollView.frameLayoutGuide.widthAnchor),
+            contentView.heightAnchor.constraint(equalToConstant: Self.timelineContentHeight),
+            timeRulerView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            timeRulerView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            timeRulerView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            timeRulerView.widthAnchor.constraint(equalToConstant: Self.timeRulerWidth),
+            dayColumnView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            dayColumnView.leadingAnchor.constraint(equalTo: timeRulerView.trailingAnchor),
+            dayColumnView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            dayColumnView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
             progressIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             progressIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor),
         ])
+    }
+
+    private func buildTimeRulerLabels() {
+        timeRulerView.subviews.forEach { $0.removeFromSuperview() }
+        for hour in Self.startHour..<Self.endHour {
+            let label = UILabel()
+            label.font = .monospacedSystemFont(ofSize: 12, weight: .medium)
+            label.textColor = .barberTextSecondary
+            label.text = String(format: "%02d:00", hour)
+            label.translatesAutoresizingMaskIntoConstraints = false
+            timeRulerView.addSubview(label)
+            let y = CGFloat(hour - Self.startHour) * Self.pointsPerHour
+            NSLayoutConstraint.activate([
+                label.leadingAnchor.constraint(equalTo: timeRulerView.leadingAnchor, constant: 8),
+                label.topAnchor.constraint(equalTo: timeRulerView.topAnchor, constant: y + 4),
+            ])
+        }
+    }
+
+    private func buildHourGridLines() {
+        dayColumnView.subviews.filter { $0.tag == 999 }.forEach { $0.removeFromSuperview() }
+        for hour in Self.startHour..<Self.endHour {
+            let line = UIView()
+            line.tag = 999
+            line.backgroundColor = .scheduleSeparator
+            line.translatesAutoresizingMaskIntoConstraints = false
+            dayColumnView.addSubview(line)
+            let y = CGFloat(hour - Self.startHour) * Self.pointsPerHour
+            NSLayoutConstraint.activate([
+                line.leadingAnchor.constraint(equalTo: dayColumnView.leadingAnchor),
+                line.trailingAnchor.constraint(equalTo: dayColumnView.trailingAnchor),
+                line.topAnchor.constraint(equalTo: dayColumnView.topAnchor, constant: y),
+                line.heightAnchor.constraint(equalToConstant: 1),
+            ])
+        }
+    }
+
+    /// Remove blocos antigos e cria um bloco por agendamento, posicionado por horário e duração.
+    private func updateTimelineBlocks() {
+        dayColumnView.subviews.filter { $0 is ScheduleAppointmentBlockView }.forEach { $0.removeFromSuperview() }
+        for order in appointmentsForSelectedDay {
+            guard let startMinutes = timeForOrder(order) else { continue }
+            let startOffsetMinutes = startMinutes - Self.startHour * 60
+            if startOffsetMinutes < 0 { continue }
+            let durationMinutes = Self.defaultDurationMinutes
+            let y = CGFloat(startOffsetMinutes) / 60.0 * Self.pointsPerHour
+            let height = CGFloat(durationMinutes) / 60.0 * Self.pointsPerHour
+            let block = ScheduleAppointmentBlockView()
+            block.configure(with: order)
+            block.translatesAutoresizingMaskIntoConstraints = false
+            dayColumnView.addSubview(block)
+            let margin: CGFloat = 6
+            NSLayoutConstraint.activate([
+                block.leadingAnchor.constraint(equalTo: dayColumnView.leadingAnchor, constant: margin),
+                block.trailingAnchor.constraint(equalTo: dayColumnView.trailingAnchor, constant: -margin),
+                block.topAnchor.constraint(equalTo: dayColumnView.topAnchor, constant: y + margin),
+                block.heightAnchor.constraint(equalToConstant: max(height - margin * 2, 28)),
+            ])
+            block.onTap = { [weak self] in self?.showAppointmentActions(for: order) }
+        }
+    }
+
+    private func showAppointmentActions(for order: Order) {
+        let alert = UIAlertController(title: order.customerName, message: nil, preferredStyle: .actionSheet)
+        let phone = order.customerPhone.trimmingCharacters(in: CharacterSet.decimalDigits.inverted)
+        if !phone.isEmpty {
+            alert.addAction(UIAlertAction(title: "Chamar no WhatsApp", style: .default) { _ in
+                let clean = phone.hasPrefix("55") ? phone : "55\(phone)"
+                if let url = URL(string: "https://wa.me/\(clean)") {
+                    UIApplication.shared.open(url)
+                }
+            })
+        }
+        alert.addAction(UIAlertAction(title: "Concluir", style: .default) { [weak self] _ in
+            self?.markFinished(order)
+        })
+        alert.addAction(UIAlertAction(title: "Cancelar", style: .cancel))
+        present(alert, animated: true)
     }
 
     private func setupCurrentTimeLine() {
@@ -316,7 +443,7 @@ final class ScheduleViewController: UIViewController {
         currentTimeLineTopConstraint = top
         NSLayoutConstraint.activate([
             top,
-            currentTimeLineView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            currentTimeLineView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Self.timeRulerWidth),
             currentTimeLineView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             currentTimeLineView.heightAnchor.constraint(equalToConstant: 2),
         ])
@@ -337,9 +464,7 @@ final class ScheduleViewController: UIViewController {
             currentTimeLineView.isHidden = true
             return
         }
-        let slotIndex = totalMinutes / 30
-        let fraction = CGFloat((totalMinutes % 30)) / 30.0
-        let y = Self.dateHeaderHeight + 8 + CGFloat(slotIndex) * Self.slotHeight + fraction * Self.slotHeight + Self.slotHeight / 2 - 1
+        let y = Self.dateHeaderHeight + 8 + CGFloat(totalMinutes) / 60.0 * Self.pointsPerHour - 1
         currentTimeLineTopConstraint?.constant = y
     }
 
@@ -361,8 +486,8 @@ final class ScheduleViewController: UIViewController {
                 await MainActor.run {
                     self.allOrders = response.orders
                     self.filterAppointmentsForSelectedDay()
+                    self.updateTimelineBlocks()
                     self.updateEmptyState()
-                    self.timelineTableView.reloadData()
                     self.progressIndicator.stopAnimating()
                     self.refreshControl.endRefreshing()
                 }
@@ -418,66 +543,6 @@ final class ScheduleViewController: UIViewController {
         return calendar.component(.hour, from: d) * 60 + calendar.component(.minute, from: d)
     }
 
-    private func orderForSlot(index: Int) -> Order? {
-        let slotStartMinutes = Self.startHour * 60 + index * 30
-        return appointmentsForSelectedDay.first { order in
-            guard let min = timeForOrder(order) else { return false }
-            return min >= slotStartMinutes && min < slotStartMinutes + 30
-        }
-    }
-
-    private func slotTimeString(at index: Int) -> String {
-        let hour = Self.startHour + (index / 2)
-        let min = (index % 2) * 30
-        return String(format: "%02d:%02d", hour, min)
-    }
-}
-
-extension ScheduleViewController: UITableViewDataSource, UITableViewDelegate {
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return Self.slotCount
-    }
-
-    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: ScheduleTimeCell.reuseId, for: indexPath) as! ScheduleTimeCell
-        let order = orderForSlot(index: indexPath.row)
-        let timeStr: String
-        if let order = order, let t = timeStringForOrder(order) {
-            timeStr = t
-        } else {
-            timeStr = slotTimeString(at: indexPath.row)
-        }
-        cell.configure(time: timeStr, order: order)
-        return cell
-    }
-
-    private func timeStringForOrder(_ order: Order) -> String? {
-        guard let min = timeForOrder(order) else { return nil }
-        let h = min / 60
-        let m = min % 60
-        return String(format: "%02d:%02d", h, m)
-    }
-
-    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        tableView.deselectRow(at: indexPath, animated: true)
-        guard let order = orderForSlot(index: indexPath.row) else { return }
-        let alert = UIAlertController(title: order.customerName, message: nil, preferredStyle: .actionSheet)
-        let phone = order.customerPhone.trimmingCharacters(in: CharacterSet.decimalDigits.inverted)
-        if !phone.isEmpty {
-            alert.addAction(UIAlertAction(title: "Chamar no WhatsApp", style: .default) { _ in
-                let clean = phone.hasPrefix("55") ? phone : "55\(phone)"
-                if let url = URL(string: "https://wa.me/\(clean)") {
-                    UIApplication.shared.open(url)
-                }
-            })
-        }
-        alert.addAction(UIAlertAction(title: "Concluir", style: .default) { [weak self] _ in
-            self?.markFinished(order)
-        })
-        alert.addAction(UIAlertAction(title: "Cancelar", style: .cancel))
-        present(alert, animated: true)
-    }
-
     private func markFinished(_ order: Order) {
         Task {
             do {
@@ -488,116 +553,60 @@ extension ScheduleViewController: UITableViewDataSource, UITableViewDelegate {
     }
 }
 
-// MARK: - Célula da timeline (hora | nome + telefone/serviço | WhatsApp)
-private final class ScheduleTimeCell: UITableViewCell {
-    static let reuseId = "ScheduleTimeCell"
+// MARK: - Bloco de agendamento (estilo Google Agenda: card com nome + serviço centralizados)
+private final class ScheduleAppointmentBlockView: UIView {
+    var onTap: (() -> Void)?
 
-    private let timeLabel: UILabel = {
-        let l = UILabel()
-        l.font = .monospacedSystemFont(ofSize: 15, weight: .bold)
-        l.textColor = .scheduleTimeLabel
-        l.translatesAutoresizingMaskIntoConstraints = false
-        return l
-    }()
-    private let cardContainer: UIView = {
-        let v = UIView()
-        v.backgroundColor = .scheduleCard
-        v.layer.cornerRadius = 10
-        v.translatesAutoresizingMaskIntoConstraints = false
-        return v
-    }()
     private let nameLabel: UILabel = {
         let l = UILabel()
         l.font = .systemFont(ofSize: 15, weight: .semibold)
-        l.textColor = .scheduleTextPrimary
+        l.textColor = .white
+        l.textAlignment = .center
+        l.numberOfLines = 1
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
-    private let subtitleLabel: UILabel = {
+    private let serviceLabel: UILabel = {
         let l = UILabel()
         l.font = .systemFont(ofSize: 13, weight: .regular)
-        l.textColor = .barberTextSecondary
+        l.textColor = .white.withAlphaComponent(0.9)
+        l.textAlignment = .center
+        l.numberOfLines = 1
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
-    private let whatsAppButton: UIButton = {
-        let b = UIButton(type: .system)
-        b.setImage(UIImage(systemName: "message.fill"), for: .normal)
-        b.tintColor = .barberPrimary
-        b.translatesAutoresizingMaskIntoConstraints = false
-        return b
-    }()
 
-    private var orderForWhatsApp: Order?
-
-    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
-        super.init(style: style, reuseIdentifier: reuseIdentifier)
-        backgroundColor = .scheduleBackground
-        contentView.backgroundColor = .scheduleBackground
-        contentView.addSubview(timeLabel)
-        contentView.addSubview(cardContainer)
-        let centerStack = UIStackView(arrangedSubviews: [nameLabel, subtitleLabel])
-        centerStack.axis = .vertical
-        centerStack.spacing = 2
-        centerStack.alignment = .leading
-        centerStack.translatesAutoresizingMaskIntoConstraints = false
-        cardContainer.addSubview(centerStack)
-        cardContainer.addSubview(whatsAppButton)
-        whatsAppButton.addTarget(self, action: #selector(openWhatsApp), for: .touchUpInside)
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = UIColor.barberPrimary.withAlphaComponent(0.85)
+        layer.cornerRadius = 8
+        clipsToBounds = true
+        let stack = UIStackView(arrangedSubviews: [nameLabel, serviceLabel])
+        stack.axis = .vertical
+        stack.spacing = 2
+        stack.alignment = .center
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
         NSLayoutConstraint.activate([
-            timeLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
-            timeLabel.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            timeLabel.widthAnchor.constraint(equalToConstant: 52),
-            cardContainer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 72),
-            cardContainer.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            cardContainer.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 6),
-            cardContainer.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -6),
-            centerStack.topAnchor.constraint(equalTo: cardContainer.topAnchor, constant: 10),
-            centerStack.leadingAnchor.constraint(equalTo: cardContainer.leadingAnchor, constant: 12),
-            centerStack.bottomAnchor.constraint(equalTo: cardContainer.bottomAnchor, constant: -10),
-            centerStack.trailingAnchor.constraint(lessThanOrEqualTo: whatsAppButton.leadingAnchor, constant: -8),
-            whatsAppButton.trailingAnchor.constraint(equalTo: cardContainer.trailingAnchor, constant: -12),
-            whatsAppButton.centerYAnchor.constraint(equalTo: cardContainer.centerYAnchor),
-            whatsAppButton.widthAnchor.constraint(equalToConstant: 44),
-            whatsAppButton.heightAnchor.constraint(equalToConstant: 44),
+            stack.centerXAnchor.constraint(equalTo: centerXAnchor),
+            stack.centerYAnchor.constraint(equalTo: centerYAnchor),
+            stack.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 8),
+            trailingAnchor.constraint(greaterThanOrEqualTo: stack.trailingAnchor, constant: 8),
         ])
+        let t = UITapGestureRecognizer(target: self, action: #selector(handleTap))
+        addGestureRecognizer(t)
+        isUserInteractionEnabled = true
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    @objc private func openWhatsApp() {
-        guard let order = orderForWhatsApp else { return }
-        let phone = order.customerPhone.trimmingCharacters(in: CharacterSet.decimalDigits.inverted)
-        guard !phone.isEmpty else { return }
-        let clean = phone.hasPrefix("55") ? phone : "55\(phone)"
-        if let url = URL(string: "https://wa.me/\(clean)") {
-            UIApplication.shared.open(url)
-        }
+    @objc private func handleTap() {
+        onTap?()
     }
 
-    func configure(time: String, order: Order?) {
-        timeLabel.text = time
-        orderForWhatsApp = order
-        if let order = order {
-            cardContainer.isHidden = false
-            nameLabel.text = order.customerName
-            let services = order.items.map { $0.name }.joined(separator: " + ")
-            let phone = order.customerPhone.trimmingCharacters(in: CharacterSet.decimalDigits.inverted)
-            if !phone.isEmpty {
-                subtitleLabel.text = formatPhoneForDisplay(order.customerPhone)
-            } else {
-                subtitleLabel.text = services.isEmpty ? "—" : services
-            }
-            whatsAppButton.isHidden = phone.isEmpty
-        } else {
-            cardContainer.isHidden = true
-        }
-    }
-
-    private func formatPhoneForDisplay(_ raw: String) -> String {
-        let digits = raw.trimmingCharacters(in: CharacterSet.decimalDigits.inverted)
-        if digits.count <= 2 { return digits.isEmpty ? "" : "(\(digits)" }
-        if digits.count <= 6 { return "(\(digits.prefix(2))) \(digits.dropFirst(2))" }
-        return "(\(digits.prefix(2))) \(digits.dropFirst(2).prefix(4))-\(digits.dropFirst(6))"
+    func configure(with order: Order) {
+        nameLabel.text = order.customerName
+        let services = order.items.map { $0.name }.joined(separator: " + ")
+        serviceLabel.text = services.isEmpty ? "—" : services
     }
 }

@@ -10,6 +10,7 @@ class AuthService {
     private let passwordKey = "saved_password"
     private let isLoggedInKey = "is_logged_in"
     private let businessTypeKey = "saved_business_type"
+    private let shouldSavePasswordKey = "should_save_password"
 
     /// Credenciais em memória para a sessão atual; evitam race em que a API é chamada antes do UserDefaults ser visível.
     private static var sessionCredentials: (username: String, password: String)?
@@ -33,15 +34,15 @@ class AuthService {
         }
         userDefaults.set(username, forKey: usernameKey)
         userDefaults.set(password, forKey: passwordKey)
+        userDefaults.set(true, forKey: shouldSavePasswordKey)
         userDefaults.set(true, forKey: isLoggedInKey)
         userDefaults.synchronize()
-        print("✅ AuthService: Credenciais verificadas - username: \(username), password presente: \(!password.isEmpty)")
+        print("✅ AuthService: Credenciais salvas (UserDefaults) - username: \(username)")
     }
 
-    /// Atualiza user/username sem persistir a senha no disco. Mantém sessionCredentials para a sessão atual.
-    func saveUserWithoutPassword(_ user: User, username: String) {
-        // Não zerar sessionCredentials: o usuário acabou de logar e a senha está em memória;
-        // assim as chamadas à API nesta sessão continuam funcionando. Só não persistimos no disco.
+    /// Atualiza user/username sem persistir a senha no disco. Mantém sessionCredentials em memória para a sessão atual (API continuar funcionando).
+    func saveUserWithoutPassword(_ user: User, username: String, passwordForSession: String) {
+        Self.sessionCredentials = (username, passwordForSession)
         if let userData = try? encoder.encode(user) {
             userDefaults.set(userData, forKey: userKey)
         }
@@ -50,6 +51,7 @@ class AuthService {
         }
         userDefaults.set(username, forKey: usernameKey)
         userDefaults.removeObject(forKey: passwordKey)
+        userDefaults.set(false, forKey: shouldSavePasswordKey)
         userDefaults.set(true, forKey: isLoggedInKey)
         userDefaults.synchronize()
     }
@@ -89,6 +91,7 @@ class AuthService {
         userDefaults.removeObject(forKey: usernameKey)
         userDefaults.removeObject(forKey: passwordKey)
         userDefaults.removeObject(forKey: businessTypeKey)
+        userDefaults.removeObject(forKey: shouldSavePasswordKey)
         userDefaults.set(false, forKey: isLoggedInKey)
         userDefaults.synchronize()
     }
