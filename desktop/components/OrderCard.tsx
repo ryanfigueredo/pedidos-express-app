@@ -19,6 +19,9 @@ interface Order {
   daily_sequence?: number;
   display_id?: string;
   customer_total_orders?: number;
+  appointment_date?: string | null;
+  order_type?: string | null;
+  estimated_time?: number | null;
 }
 
 interface OrderCardProps {
@@ -50,6 +53,34 @@ export function OrderCard({ order, onReprint, onPrint }: OrderCardProps) {
     }).format(numPrice);
   };
 
+  const scheduledLabel = (): string | null => {
+    if (!order.appointment_date) return null;
+    const d = new Date(order.appointment_date);
+    const today = new Date();
+    const isToday =
+      d.getDate() === today.getDate() &&
+      d.getMonth() === today.getMonth() &&
+      d.getFullYear() === today.getFullYear();
+    if (isToday) return null;
+    const dayLabel =
+      d.getDate() === today.getDate() + 1 &&
+      d.getMonth() === today.getMonth() &&
+      d.getFullYear() === today.getFullYear()
+        ? "Amanhã"
+        : new Intl.DateTimeFormat("pt-BR", {
+            weekday: "short",
+            day: "numeric",
+            month: "short",
+          }).format(d);
+    const time = new Intl.DateTimeFormat("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(d);
+    return `Agendado: ${dayLabel} às ${time}`;
+  };
+
+  const scheduledText = scheduledLabel();
+
   return (
     <div
       className={`card-modern p-6 transition-all duration-300 hover:scale-[1.02] ${
@@ -70,6 +101,11 @@ export function OrderCard({ order, onReprint, onPrint }: OrderCardProps) {
             {order.daily_sequence && (
               <span className="badge badge-info">
                 {order.daily_sequence}º do dia
+              </span>
+            )}
+            {scheduledText && (
+              <span className="badge bg-indigo-100 text-indigo-800 border border-indigo-200">
+                {scheduledText}
               </span>
             )}
             <span

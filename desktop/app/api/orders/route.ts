@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getStoreStatus } from "@/lib/store-status";
 import { Prisma } from "@prisma/client";
 import { getTenantIdFromRequest } from "@/lib/tenant-from-request";
+import { getAgendaDateRange } from "@/lib/agenda-date-range";
 
 // Forçar rota dinâmica (não pode ser renderizada estaticamente)
 export const dynamic = "force-dynamic";
@@ -76,32 +77,37 @@ export async function GET(request: NextRequest) {
 
     console.log("✅ Tenant identificado:", tenantId);
 
-    // Paginação
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
+    const limit = Math.min(parseInt(searchParams.get("limit") || "20"), 200);
     const skip = (page - 1) * limit;
+    const agendaDays = searchParams.get("agenda_days");
+    const useAgendaFilter = agendaDays != null && /^[1-9]\d*$/.test(agendaDays);
+    const daysAhead = useAgendaFilter ? parseInt(agendaDays, 10) : 0;
+    const { startOfToday, endOfRange, twoDaysAgo } = useAgendaFilter
+      ? getAgendaDateRange(daysAhead)
+      : { startOfToday: null, endOfRange: null, twoDaysAgo: null };
 
-    // Buscar todos os pedidos do tenant (todos os status) para app e dashboard
-    // assim Rota (out_for_delivery) e Entregues (finished) aparecem no app
     let total = 0;
     let orders: any[] = [];
 
     try {
-      total = await prisma.order.count({
-        where: {
-          tenant_id: tenantId,
-        },
-      });
-
+      const whereClause: Prisma.OrderWhereInput = {
+        tenant_id: tenantId,
+      };
+      if (useAgendaFilter && startOfToday && endOfRange && twoDaysAgo) {
+        whereClause.OR = [
+          { appointment_date: null, created_at: { gte: twoDaysAgo } },
+          { appointment_date: { gte: startOfToday, lt: endOfRange } },
+        ];
+      }
+      total = await prisma.order.count({ where: whereClause });
       orders = await prisma.order.findMany({
-        where: {
-          tenant_id: tenantId,
-        },
-        orderBy: {
-          created_at: "desc", // Mais recentes primeiro
-        },
-        skip,
+        where: whereClause,
+        orderBy: useAgendaFilter
+          ? [{ appointment_date: "asc" }, { created_at: "desc" }]
+          : { created_at: "desc" },
+        skip: useAgendaFilter ? 0 : skip,
         take: limit,
       });
     } catch (orderError: any) {

@@ -1,12 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { OrderCard } from "@/components/OrderCard";
 import { getOrdersLabel } from "@/lib/business-type-helper";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
+const START_HOUR = 8;
+const END_HOUR = 21;
+const POINTS_PER_HOUR = 60;
+const DEFAULT_DURATION_MIN = 30;
 
 interface Order {
   id: string;
@@ -25,6 +30,9 @@ interface Order {
   daily_sequence?: number;
   display_id?: string;
   customer_total_orders?: number;
+  appointment_date?: string | null;
+  order_type?: string | null;
+  estimated_time?: number | null;
 }
 
 export default function DashboardStreamPage() {
@@ -90,9 +98,38 @@ export default function DashboardStreamPage() {
   };
 
   const handlePrint = (orderId: string) => {
-    // Abre página de impressão para usar impressora normal do PC
     window.open(`/dashboard/imprimir/${orderId}`, "_blank", "noopener");
   };
+
+  const isBarber = user?.business_type === "BARBEIRO";
+
+  const { todayOrders, tomorrowOrders } = useMemo(() => {
+    const today = new Date();
+    const todayStart = new Date(today);
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(todayStart);
+    todayEnd.setDate(todayEnd.getDate() + 1);
+    const tomorrowEnd = new Date(todayStart);
+    tomorrowEnd.setDate(tomorrowEnd.getDate() + 2);
+    const withAppointment = orders.filter((o) => o.appointment_date);
+    const todayOrders = withAppointment.filter((o) => {
+      const d = new Date(o.appointment_date!);
+      return d >= todayStart && d < todayEnd;
+    });
+    const tomorrowOrders = withAppointment.filter((o) => {
+      const d = new Date(o.appointment_date!);
+      return d >= todayEnd && d < tomorrowEnd;
+    });
+    const toMinutes = (date: Date) => date.getHours() * 60 + date.getMinutes();
+    const byTime = (a: Order, b: Order) =>
+      toMinutes(new Date(a.appointment_date!)) - toMinutes(new Date(b.appointment_date!));
+    todayOrders.sort(byTime);
+    tomorrowOrders.sort(byTime);
+    return { todayOrders, tomorrowOrders };
+  }, [orders]);
+
+  const [agendaDay, setAgendaDay] = useState<"hoje" | "amanha">("hoje");
+  const agendaOrders = agendaDay === "hoje" ? todayOrders : tomorrowOrders;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
@@ -124,7 +161,90 @@ export default function DashboardStreamPage() {
           </div>
         )}
 
-        {!isLoading && !error && orders && orders.length > 0 && (
+        {!isLoading && !error && orders && orders.length > 0 && isBarber && (
+          <>
+            <div className="flex gap-2 mb-4">
+              <button
+                type="button"
+                onClick={() => setAgendaDay("hoje")}
+                className={`px-4 py-2 rounded-lg font-medium ${
+                  agendaDay === "hoje"
+                    ? "bg-primary-600 text-white"
+                    : "bg-white border border-gray-300 text-gray-700"
+                }`}
+              >
+                Hoje
+              </button>
+              <button
+                type="button"
+                onClick={() => setAgendaDay("amanha")}
+                className={`px-4 py-2 rounded-lg font-medium ${
+                  agendaDay === "amanha"
+                    ? "bg-primary-600 text-white"
+                    : "bg-white border border-gray-300 text-gray-700"
+                }`}
+              >
+                Amanhã
+              </button>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="flex min-h-[520px]">
+                <div className="w-16 shrink-0 border-r border-gray-200 bg-gray-50/80 py-2">
+                  {Array.from({ length: END_HOUR - START_HOUR }, (_, i) => START_HOUR + i).map(
+                    (h) => (
+                      <div
+                        key={h}
+                        className="h-[60px] flex items-start justify-end pr-2 text-sm text-gray-500 font-medium"
+                        style={{ height: POINTS_PER_HOUR }}
+                      >
+                        {String(h).padStart(2, "0")}:00
+                      </div>
+                    )
+                  )}
+                </div>
+                <div className="flex-1 relative min-h-[520px]" style={{ height: (END_HOUR - START_HOUR) * POINTS_PER_HOUR }}>
+                  {agendaOrders.map((order) => {
+                    const d = new Date(order.appointment_date!);
+                    const startMinutes = (d.getHours() - START_HOUR) * 60 + d.getMinutes();
+                    const duration = order.estimated_time ?? DEFAULT_DURATION_MIN;
+                    const top = (startMinutes / 60) * POINTS_PER_HOUR;
+                    const height = Math.max(44, (duration / 60) * POINTS_PER_HOUR);
+                    return (
+                      <div
+                        key={order.id}
+                        className="absolute left-2 right-2 rounded-xl shadow-md border border-gray-200 bg-white overflow-hidden flex flex-col"
+                        style={{
+                          top: top + 2,
+                          height: height - 4,
+                          minHeight: 44,
+                        }}
+                      >
+                        <div className="p-2 flex-1 flex flex-col min-0">
+                          <div className="font-semibold text-gray-900 truncate text-sm">
+                            {order.customer_name}
+                          </div>
+                          <div className="text-xs text-gray-500 truncate">
+                            {order.items?.[0]?.name ?? order.display_id ?? ""}
+                          </div>
+                          {height >= 56 && (
+                            <div className="text-xs font-medium text-primary-600 mt-auto">
+                              {new Intl.DateTimeFormat("pt-BR", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              }).format(d)}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {!isLoading && !error && orders && orders.length > 0 && !isBarber && (
           <div className="space-y-4">
             {orders.map((order) => (
               <OrderCard
@@ -134,6 +254,22 @@ export default function DashboardStreamPage() {
                 onPrint={handlePrint}
               />
             ))}
+          </div>
+        )}
+
+        {!isLoading && !error && orders && orders.length > 0 && isBarber && (
+          <div className="mt-8">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Lista</h2>
+            <div className="space-y-4">
+              {orders.map((order) => (
+                <OrderCard
+                  key={order.id}
+                  order={order}
+                  onReprint={handleReprint}
+                  onPrint={handlePrint}
+                />
+              ))}
+            </div>
           </div>
         )}
       </div>

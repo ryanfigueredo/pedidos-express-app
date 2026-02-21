@@ -23,9 +23,6 @@ class ApiService {
     
     private func getAuthHeader() -> String? {
         guard let credentials = authService.getCredentials() else {
-            #if DEBUG
-            print("⚠️ ApiService: Sem credenciais (login não realizado ou senha não salva)")
-            #endif
             return nil
         }
         let credentialsString = "\(credentials.username):\(credentials.password)"

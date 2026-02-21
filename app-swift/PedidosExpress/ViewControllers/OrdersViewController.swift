@@ -39,11 +39,16 @@ class OrdersViewController: UIViewController {
         setupUI()
         setupTableView()
         requestBluetoothPermissions()
+        NotificationCenter.default.addObserver(self, selector: #selector(onDidLogin), name: .pedidosDidLogin, object: nil)
         loadOrders()
         if user?.isBarbeiro == true {
             loadFreeSlots()
         }
         startAutoRefresh()
+    }
+
+    @objc private func onDidLogin() {
+        loadOrders(silent: false)
     }
     
     private func loadFreeSlots() {
@@ -364,18 +369,21 @@ class OrdersViewController: UIViewController {
     }
     
     private func loadOrders(silent: Bool = false) {
-        // Garantir que estamos no thread principal para atualizar UI
         guard Thread.isMainThread else {
             DispatchQueue.main.async { [weak self] in
                 self?.loadOrders(silent: silent)
             }
             return
         }
-        
+        let authService = AuthService()
+        guard authService.isLoggedIn(), authService.getCredentials() != nil else {
+            if !silent { progressIndicator.stopAnimating() }
+            refreshControl?.endRefreshing()
+            return
+        }
         if !silent {
             progressIndicator.startAnimating()
         }
-        
         Task { [weak self] in
             guard let self = self else { return }
             do {

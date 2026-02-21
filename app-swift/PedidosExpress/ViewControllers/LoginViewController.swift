@@ -307,6 +307,9 @@ class LoginViewController: UIViewController {
                     progressIndicator.stopAnimating()
                     loginButton.isEnabled = true
                     navigateToMain()
+                    DispatchQueue.main.async {
+                        NotificationCenter.default.post(name: .pedidosDidLogin, object: nil)
+                    }
                 }
             } catch {
                 await MainActor.run {

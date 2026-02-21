@@ -1,5 +1,10 @@
 import UIKit
 
+/// Notificação enviada após login bem-sucedido para que telas (Orders, Agenda) recarreguem dados.
+extension Notification.Name {
+    static let pedidosDidLogin = Notification.Name("PedidosExpressDidLogin")
+}
+
 /// Define qual interface principal mostrar (abas) e define como root da window.
 /// Chamar após login confirmado e no AppDelegate/SceneDelegate após validar credenciais.
 enum AppRouter {

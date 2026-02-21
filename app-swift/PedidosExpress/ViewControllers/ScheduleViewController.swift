@@ -82,6 +82,11 @@ final class ScheduleViewController: UIViewController {
             )
             navigationItem.rightBarButtonItem?.tintColor = .barberPrimary
         }
+        NotificationCenter.default.addObserver(self, selector: #selector(onDidLogin), name: .pedidosDidLogin, object: nil)
+        loadOrders()
+    }
+
+    @objc private func onDidLogin() {
         loadOrders()
     }
 
@@ -478,6 +483,12 @@ final class ScheduleViewController: UIViewController {
     }
 
     private func loadOrders() {
+        let authService = AuthService()
+        guard authService.isLoggedIn(), authService.getCredentials() != nil else {
+            progressIndicator.stopAnimating()
+            refreshControl.endRefreshing()
+            return
+        }
         progressIndicator.startAnimating()
         Task { [weak self] in
             guard let self = self else { return }
