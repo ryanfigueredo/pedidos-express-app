@@ -9,6 +9,9 @@ class SupportViewController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        if BusinessProvider.isBarber {
+            overrideUserInterfaceStyle = .dark
+        }
         title = BusinessProvider.isBarber ? "Atendimento" : "Suporte"
         navigationItem.largeTitleDisplayMode = .never
         setupUI()

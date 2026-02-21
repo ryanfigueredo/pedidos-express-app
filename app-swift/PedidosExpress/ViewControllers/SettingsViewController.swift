@@ -32,6 +32,9 @@ class SettingsViewController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        if BusinessProvider.isBarber {
+            overrideUserInterfaceStyle = .dark
+        }
         title = "Configurações"
         navigationItem.largeTitleDisplayMode = .never
         user = authService.getUser()
@@ -77,10 +80,11 @@ class SettingsViewController: UIViewController {
     }
     
     private func setupUI() {
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = BusinessProvider.backgroundColor
         
         settingsTableView = UITableView(frame: .zero, style: .insetGrouped)
         settingsTableView.translatesAutoresizingMaskIntoConstraints = false
+        settingsTableView.backgroundColor = BusinessProvider.backgroundColor
         view.addSubview(settingsTableView)
         
         NSLayoutConstraint.activate([
@@ -260,10 +264,11 @@ extension SettingsViewController: UITableViewDataSource, UITableViewDelegate {
         
         cell.textLabel?.text = nil
         cell.textLabel?.numberOfLines = 1
-        cell.textLabel?.textColor = .label
+        cell.textLabel?.textColor = BusinessProvider.textPrimaryColor
         cell.detailTextLabel?.text = nil
+        cell.detailTextLabel?.textColor = BusinessProvider.textSecondaryColor
         cell.accessoryType = .none
-        cell.backgroundColor = .systemBackground
+        cell.backgroundColor = BusinessProvider.cardBackgroundColor
         cell.selectionStyle = .default
         
         if indexPath.section == 0 {

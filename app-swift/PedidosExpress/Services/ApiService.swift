@@ -485,15 +485,25 @@ class ApiService {
     }
 
     /// Cria um agendamento manual (cliente agendado pessoalmente, fora do WhatsApp).
-    func createAppointment(customerName: String, customerPhone: String, appointmentDate: String) async throws {
+    /// Se `service` for informado, envia o item no pedido; senão envia lista vazia e total 0.
+    func createAppointment(customerName: String, customerPhone: String, appointmentDate: String, service: MenuItem? = nil) async throws {
         let url = "\(baseURL)/api/orders"
+        let items: [[String: Any]]
+        let totalPrice: Double
+        if let svc = service {
+            items = [["id": svc.id, "name": svc.name, "quantity": 1, "price": svc.price]]
+            totalPrice = svc.price
+        } else {
+            items = []
+            totalPrice = 0.0
+        }
         let bodyDict: [String: Any] = [
             "customer_name": customerName,
             "customer_phone": customerPhone.isEmpty ? "local" : customerPhone,
             "order_type": "appointment",
             "appointment_date": appointmentDate,
-            "items": [] as [[String: Any]],
-            "total_price": 0.0
+            "items": items,
+            "total_price": totalPrice
         ]
         let body = try JSONSerialization.data(withJSONObject: bodyDict)
 
@@ -812,13 +822,21 @@ class ApiService {
         let body = try JSONSerialization.data(withJSONObject: bodyDict)
         
         guard let request = buildRequest(url: url, method: "POST", body: body) else {
+            if authService.getCredentials() == nil {
+                throw ApiError.unauthorized
+            }
             throw ApiError.invalidURL
         }
         
         let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
+        guard let httpResponse = response as? HTTPURLResponse else { throw ApiError.invalidResponse }
+        guard (200...299).contains(httpResponse.statusCode) else {
+            if httpResponse.statusCode == 401 { throw ApiError.unauthorized }
+            if (400...499).contains(httpResponse.statusCode),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let msg = (json["error"] as? String ?? json["message"] as? String), !msg.isEmpty {
+                throw ApiError.networkError(msg)
+            }
             throw ApiError.requestFailed
         }
         

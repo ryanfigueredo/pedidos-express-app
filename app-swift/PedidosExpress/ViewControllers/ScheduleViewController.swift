@@ -38,21 +38,23 @@ final class ScheduleViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        if BusinessProvider.isBarber {
+            overrideUserInterfaceStyle = .dark
+        }
         title = BusinessProvider.isBarber ? "Agenda" : "Minha Agenda"
         view.backgroundColor = .scheduleBackground
         navigationItem.largeTitleDisplayMode = .never
         navigationItem.rightBarButtonItems = []
         navigationItem.leftBarButtonItems = []
 
-        // Nav Bar: blur + grafite #121212 (glassmorphism, conteúdo passa por baixo)
+        // Nav Bar: preto opaco, títulos dourados (tema barbeiro)
         let nav = navigationController?.navigationBar
-        nav?.barTintColor = .barberChrome
+        nav?.barTintColor = .barberNavBackground
         nav?.tintColor = .barberPrimary
-        nav?.isTranslucent = true
+        nav?.isTranslucent = false
         let appearance = UINavigationBarAppearance()
-        appearance.configureWithTransparentBackground()
-        appearance.backgroundEffect = UIBlurEffect(style: .dark)
-        appearance.backgroundColor = UIColor.barberChrome.withAlphaComponent(0.72)
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = .barberNavBackground
         appearance.titleTextAttributes = [.foregroundColor: UIColor.barberPrimary]
         nav?.standardAppearance = appearance
         nav?.scrollEdgeAppearance = appearance
@@ -90,81 +92,62 @@ final class ScheduleViewController: UIViewController {
     }
 
     @objc private func addManualAppointment() {
-        let alert = UIAlertController(
-            title: "Novo agendamento",
-            message: "Cliente que está agendando pessoalmente (fora do WhatsApp).",
-            preferredStyle: .alert
-        )
-        alert.addTextField { field in
-            field.placeholder = "Nome do cliente"
-            field.autocapitalizationType = .words
+        let sheet = ManualAppointmentSheetViewController()
+        sheet.onSave = { [weak self] name, phone, chosenDate, service in
+            self?.createManualAppointment(customerName: name, customerPhone: phone, appointmentDate: chosenDate, service: service)
         }
-        alert.addTextField { field in
-            field.placeholder = "Telefone (opcional)"
-            field.keyboardType = .phonePad
+        let nav = UINavigationController(rootViewController: sheet)
+        nav.modalPresentationStyle = .pageSheet
+        if let sheet = nav.sheetPresentationController {
+            sheet.detents = [.medium(), .large()]
+            sheet.prefersGrabberVisible = true
         }
-        alert.addAction(UIAlertAction(title: "Cancelar", style: .cancel))
-        alert.addAction(UIAlertAction(title: "Escolher horário", style: .default) { [weak self] _ in
-            guard let self = self else { return }
-            let name = alert.textFields?.first?.text?.trimmingCharacters(in: .whitespaces) ?? "Cliente"
-            let phone = alert.textFields?.last?.text?.trimmingCharacters(in: .whitespaces) ?? ""
-            self.showTimePickerForManualAppointment(customerName: name, customerPhone: phone)
-        })
-        present(alert, animated: true)
+        present(nav, animated: true)
     }
 
-    private func showTimePickerForManualAppointment(customerName: String, customerPhone: String) {
-        let slots = (0..<Self.slotCount).map { index in
-            (index, slotTimeString(at: index))
-        }
-        let alert = UIAlertController(title: "Horário", message: "Selecione o horário para o dia \(headerDateFormatter.string(from: selectedDate))", preferredStyle: .actionSheet)
-        for (index, timeStr) in slots {
-            alert.addAction(UIAlertAction(title: timeStr, style: .default) { [weak self] _ in
-                self?.createManualAppointment(customerName: customerName, customerPhone: customerPhone, slotIndex: index)
-            })
-        }
-        alert.addAction(UIAlertAction(title: "Cancelar", style: .cancel))
-        if let popover = alert.popoverPresentationController {
-            popover.barButtonItem = navigationItem.rightBarButtonItem
-            popover.sourceView = view
-        }
-        present(alert, animated: true)
-    }
-
-    private func createManualAppointment(customerName: String, customerPhone: String, slotIndex: Int) {
-        let hour = Self.startHour + (slotIndex / 2)
-        let minute = (slotIndex % 2) * 30
-        let startOfDay = calendar.startOfDay(for: selectedDate)
-        guard let appointmentDate = calendar.date(bySettingHour: hour, minute: minute, second: 0, of: startOfDay) else {
-            showMessage("Não foi possível definir o horário.")
-            return
-        }
+    private func createManualAppointment(customerName: String, customerPhone: String, appointmentDate chosenDate: Date, service: MenuItem?) {
         let isoFormatter = ISO8601DateFormatter()
         isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let appointmentDateString = isoFormatter.string(from: appointmentDate)
+        let appointmentDateString = isoFormatter.string(from: chosenDate)
+        let phoneNormalized = ManualAppointmentSheetViewController.normalizePhone(customerPhone)
+        let phoneForApi = phoneNormalized.isEmpty ? "" : (phoneNormalized.hasPrefix("55") ? phoneNormalized : "55\(phoneNormalized)")
 
+        progressIndicator.startAnimating()
         Task {
             do {
-                try await apiService.createAppointment(customerName: customerName, customerPhone: customerPhone, appointmentDate: appointmentDateString)
+                try await apiService.createAppointment(customerName: customerName, customerPhone: phoneForApi, appointmentDate: appointmentDateString, service: service)
                 await MainActor.run {
-                    showMessage("Agendamento adicionado.")
+                    progressIndicator.stopAnimating()
+                    selectedDate = chosenDate
+                    updateDateLabel()
+                    filterAppointmentsForSelectedDay()
+                    updateEmptyState()
+                    timelineTableView.reloadData()
                     loadOrders()
+                    showMessage("Agendamento adicionado.") { [weak self] in
+                        self?.loadOrders(for: chosenDate)
+                    }
                 }
             } catch let err as ApiError {
                 await MainActor.run {
+                    progressIndicator.stopAnimating()
                     showMessage(err.localizedDescription)
                 }
             } catch {
                 await MainActor.run {
+                    progressIndicator.stopAnimating()
                     showMessage("Não foi possível criar o agendamento. Tente novamente.")
                 }
             }
         }
     }
 
-    private func showMessage(_ message: String) {
+    /// Mostra um alerta. Se onDismiss for passado, é chamado quando o usuário toca em OK (útil para recarregar a lista após criar agendamento).
+    private func showMessage(_ message: String, onDismiss: (() -> Void)? = nil) {
         let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
+            onDismiss?()
+        })
         present(alert, animated: true)
     }
 
@@ -177,11 +160,11 @@ final class ScheduleViewController: UIViewController {
         updateCurrentTimeLinePosition()
     }
 
-    // MARK: - Cabeçalho de data (Squire: [<] Nome do dia e data [>])
+    // MARK: - Cabeçalho de data (Squire: [<] Nome do dia e data [>]) — fundo escuro, letras douradas
     private func setupDateHeader() {
         dateHeaderContainer = UIView()
         dateHeaderContainer.translatesAutoresizingMaskIntoConstraints = false
-        dateHeaderContainer.backgroundColor = .scheduleBackground
+        dateHeaderContainer.backgroundColor = .barberNavBackground
         view.addSubview(dateHeaderContainer)
 
         let leftButton = UIButton(type: .system)
@@ -192,7 +175,7 @@ final class ScheduleViewController: UIViewController {
 
         dateLabel = UILabel()
         dateLabel.font = .boldSystemFont(ofSize: 18)
-        dateLabel.textColor = .scheduleTextPrimary
+        dateLabel.textColor = .barberPrimary
         dateLabel.textAlignment = .center
         dateLabel.translatesAutoresizingMaskIntoConstraints = false
 
@@ -360,6 +343,15 @@ final class ScheduleViewController: UIViewController {
         currentTimeLineTopConstraint?.constant = y
     }
 
+    /// Recarrega a lista e opcionalmente navega para o dia informado (ex.: após criar agendamento em outro dia).
+    private func loadOrders(for date: Date? = nil) {
+        if let date = date {
+            selectedDate = date
+            updateDateLabel()
+        }
+        loadOrders()
+    }
+
     private func loadOrders() {
         progressIndicator.startAnimating()
         Task { [weak self] in
@@ -390,14 +382,10 @@ final class ScheduleViewController: UIViewController {
     private func filterAppointmentsForSelectedDay() {
         let startOfSelected = calendar.startOfDay(for: selectedDate)
         let endOfSelected = calendar.date(byAdding: .day, value: 1, to: startOfSelected)!
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         appointmentsForSelectedDay = allOrders.filter { order in
-            let dateToUse: Date?
-            if let apt = order.appointmentDate, !apt.isEmpty {
-                dateToUse = dateFormatter.date(from: String(apt.prefix(19)))
-                    ?? ISO8601DateFormatter().date(from: apt)
-            } else {
-                dateToUse = ISO8601DateFormatter().date(from: order.createdAt)
-            }
+            let dateToUse: Date? = dateForOrder(order, isoFormatter: iso)
             guard let d = dateToUse else { return false }
             return d >= startOfSelected && d < endOfSelected
         }.sorted { o1, o2 in
@@ -407,16 +395,26 @@ final class ScheduleViewController: UIViewController {
         }
     }
 
+    /// Data/hora do agendamento (appointment_date em UTC ou created_at). Usa ISO8601 para não trocar horário.
+    private func dateForOrder(_ order: Order, isoFormatter: ISO8601DateFormatter? = nil) -> Date? {
+        let iso = isoFormatter ?? {
+            let f = ISO8601DateFormatter()
+            f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            return f
+        }()
+        if let apt = order.appointmentDate, !apt.isEmpty {
+            return iso.date(from: apt)
+                ?? iso.date(from: apt.replacingOccurrences(of: "Z", with: "+00:00"))
+                ?? dateFormatter.date(from: String(apt.prefix(19)))
+        }
+        return iso.date(from: order.createdAt)
+    }
+
     /// Minutos desde meia-noite (para ordenação)
     private func timeForOrder(_ order: Order) -> Int? {
-        let dateToUse: Date?
-        if let apt = order.appointmentDate, !apt.isEmpty {
-            dateToUse = dateFormatter.date(from: String(apt.prefix(19)))
-                ?? ISO8601DateFormatter().date(from: apt)
-        } else {
-            dateToUse = ISO8601DateFormatter().date(from: order.createdAt)
-        }
-        guard let d = dateToUse else { return nil }
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        guard let d = dateForOrder(order, isoFormatter: iso) else { return nil }
         return calendar.component(.hour, from: d) * 60 + calendar.component(.minute, from: d)
     }
 
@@ -442,10 +440,22 @@ extension ScheduleViewController: UITableViewDataSource, UITableViewDelegate {
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: ScheduleTimeCell.reuseId, for: indexPath) as! ScheduleTimeCell
-        let timeStr = slotTimeString(at: indexPath.row)
         let order = orderForSlot(index: indexPath.row)
+        let timeStr: String
+        if let order = order, let t = timeStringForOrder(order) {
+            timeStr = t
+        } else {
+            timeStr = slotTimeString(at: indexPath.row)
+        }
         cell.configure(time: timeStr, order: order)
         return cell
+    }
+
+    private func timeStringForOrder(_ order: Order) -> String? {
+        guard let min = timeForOrder(order) else { return nil }
+        let h = min / 60
+        let m = min % 60
+        return String(format: "%02d:%02d", h, m)
     }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
@@ -478,13 +488,13 @@ extension ScheduleViewController: UITableViewDataSource, UITableViewDelegate {
     }
 }
 
-// MARK: - Célula da timeline (hora + card opcional)
+// MARK: - Célula da timeline (hora | nome + telefone/serviço | WhatsApp)
 private final class ScheduleTimeCell: UITableViewCell {
     static let reuseId = "ScheduleTimeCell"
 
     private let timeLabel: UILabel = {
         let l = UILabel()
-        l.font = .monospacedSystemFont(ofSize: 14, weight: .semibold)
+        l.font = .monospacedSystemFont(ofSize: 15, weight: .bold)
         l.textColor = .scheduleTimeLabel
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
@@ -503,19 +513,22 @@ private final class ScheduleTimeCell: UITableViewCell {
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
-    private let serviceLabel: UILabel = {
+    private let subtitleLabel: UILabel = {
         let l = UILabel()
         l.font = .systemFont(ofSize: 13, weight: .regular)
-        l.textColor = .scheduleTextSecondary
+        l.textColor = .barberTextSecondary
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
-    private let badgeLabel: UILabel = {
-        let l = UILabel()
-        l.font = .systemFont(ofSize: 11, weight: .medium)
-        l.translatesAutoresizingMaskIntoConstraints = false
-        return l
+    private let whatsAppButton: UIButton = {
+        let b = UIButton(type: .system)
+        b.setImage(UIImage(systemName: "message.fill"), for: .normal)
+        b.tintColor = .barberPrimary
+        b.translatesAutoresizingMaskIntoConstraints = false
+        return b
     }()
+
+    private var orderForWhatsApp: Order?
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -523,9 +536,14 @@ private final class ScheduleTimeCell: UITableViewCell {
         contentView.backgroundColor = .scheduleBackground
         contentView.addSubview(timeLabel)
         contentView.addSubview(cardContainer)
-        cardContainer.addSubview(nameLabel)
-        cardContainer.addSubview(serviceLabel)
-        cardContainer.addSubview(badgeLabel)
+        let centerStack = UIStackView(arrangedSubviews: [nameLabel, subtitleLabel])
+        centerStack.axis = .vertical
+        centerStack.spacing = 2
+        centerStack.alignment = .leading
+        centerStack.translatesAutoresizingMaskIntoConstraints = false
+        cardContainer.addSubview(centerStack)
+        cardContainer.addSubview(whatsAppButton)
+        whatsAppButton.addTarget(self, action: #selector(openWhatsApp), for: .touchUpInside)
         NSLayoutConstraint.activate([
             timeLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
             timeLabel.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
@@ -534,32 +552,52 @@ private final class ScheduleTimeCell: UITableViewCell {
             cardContainer.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             cardContainer.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 6),
             cardContainer.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -6),
-            nameLabel.topAnchor.constraint(equalTo: cardContainer.topAnchor, constant: 10),
-            nameLabel.leadingAnchor.constraint(equalTo: cardContainer.leadingAnchor, constant: 12),
-            nameLabel.trailingAnchor.constraint(lessThanOrEqualTo: badgeLabel.leadingAnchor, constant: -8),
-            serviceLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 4),
-            serviceLabel.leadingAnchor.constraint(equalTo: cardContainer.leadingAnchor, constant: 12),
-            serviceLabel.trailingAnchor.constraint(equalTo: cardContainer.trailingAnchor, constant: -12),
-            serviceLabel.bottomAnchor.constraint(equalTo: cardContainer.bottomAnchor, constant: -10),
-            badgeLabel.trailingAnchor.constraint(equalTo: cardContainer.trailingAnchor, constant: -12),
-            badgeLabel.centerYAnchor.constraint(equalTo: nameLabel.centerYAnchor),
+            centerStack.topAnchor.constraint(equalTo: cardContainer.topAnchor, constant: 10),
+            centerStack.leadingAnchor.constraint(equalTo: cardContainer.leadingAnchor, constant: 12),
+            centerStack.bottomAnchor.constraint(equalTo: cardContainer.bottomAnchor, constant: -10),
+            centerStack.trailingAnchor.constraint(lessThanOrEqualTo: whatsAppButton.leadingAnchor, constant: -8),
+            whatsAppButton.trailingAnchor.constraint(equalTo: cardContainer.trailingAnchor, constant: -12),
+            whatsAppButton.centerYAnchor.constraint(equalTo: cardContainer.centerYAnchor),
+            whatsAppButton.widthAnchor.constraint(equalToConstant: 44),
+            whatsAppButton.heightAnchor.constraint(equalToConstant: 44),
         ])
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
+    @objc private func openWhatsApp() {
+        guard let order = orderForWhatsApp else { return }
+        let phone = order.customerPhone.trimmingCharacters(in: CharacterSet.decimalDigits.inverted)
+        guard !phone.isEmpty else { return }
+        let clean = phone.hasPrefix("55") ? phone : "55\(phone)"
+        if let url = URL(string: "https://wa.me/\(clean)") {
+            UIApplication.shared.open(url)
+        }
+    }
+
     func configure(time: String, order: Order?) {
         timeLabel.text = time
+        orderForWhatsApp = order
         if let order = order {
             cardContainer.isHidden = false
             nameLabel.text = order.customerName
-            let services = order.items.map { "\($0.name)" }.joined(separator: " + ")
-            serviceLabel.text = services.isEmpty ? "Serviço" : services
-            let confirmed = order.status == "printed" || order.status == "out_for_delivery" || order.status == "finished"
-            badgeLabel.text = confirmed ? "Confirmado" : "Pendente"
-            badgeLabel.textColor = confirmed ? .scheduleBadgeConfirmed : .scheduleBadgePending
+            let services = order.items.map { $0.name }.joined(separator: " + ")
+            let phone = order.customerPhone.trimmingCharacters(in: CharacterSet.decimalDigits.inverted)
+            if !phone.isEmpty {
+                subtitleLabel.text = formatPhoneForDisplay(order.customerPhone)
+            } else {
+                subtitleLabel.text = services.isEmpty ? "—" : services
+            }
+            whatsAppButton.isHidden = phone.isEmpty
         } else {
             cardContainer.isHidden = true
         }
+    }
+
+    private func formatPhoneForDisplay(_ raw: String) -> String {
+        let digits = raw.trimmingCharacters(in: CharacterSet.decimalDigits.inverted)
+        if digits.count <= 2 { return digits.isEmpty ? "" : "(\(digits)" }
+        if digits.count <= 6 { return "(\(digits.prefix(2))) \(digits.dropFirst(2))" }
+        return "(\(digits.prefix(2))) \(digits.dropFirst(2).prefix(4))-\(digits.dropFirst(6))"
     }
 }

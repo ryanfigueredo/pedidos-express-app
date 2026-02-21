@@ -38,8 +38,10 @@ class AuthService {
         print("✅ AuthService: Credenciais verificadas - username: \(username), password presente: \(!password.isEmpty)")
     }
 
+    /// Atualiza user/username sem persistir a senha no disco. Mantém sessionCredentials para a sessão atual.
     func saveUserWithoutPassword(_ user: User, username: String) {
-        Self.sessionCredentials = nil
+        // Não zerar sessionCredentials: o usuário acabou de logar e a senha está em memória;
+        // assim as chamadas à API nesta sessão continuam funcionando. Só não persistimos no disco.
         if let userData = try? encoder.encode(user) {
             userDefaults.set(userData, forKey: userKey)
         }

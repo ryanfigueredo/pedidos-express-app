@@ -19,10 +19,27 @@ class MenuItemTableViewCell: UITableViewCell {
     private func setupUI() {
         nameLabel.font = .boldSystemFont(ofSize: 16)
         categoryLabel.font = .systemFont(ofSize: 14)
-        categoryLabel.textColor = .secondaryLabel
         priceLabel.font = .boldSystemFont(ofSize: 16)
-        priceLabel.textColor = .systemGreen
-        
+
+        if BusinessProvider.isBarber {
+            nameLabel.textColor = .barberTextPrimary
+            categoryLabel.textColor = .barberTextSecondary
+            priceLabel.textColor = .barberPrimary
+            contentView.backgroundColor = .barberCard
+            backgroundColor = .barberBackground
+            selectedBackgroundView = {
+                let v = UIView()
+                v.backgroundColor = UIColor.barberCard.withAlphaComponent(0.8)
+                return v
+            }()
+        } else {
+            nameLabel.textColor = .pedidosTextPrimary
+            categoryLabel.textColor = .secondaryLabel
+            priceLabel.textColor = .systemGreen
+            contentView.backgroundColor = .pedidosOrangeLight
+            backgroundColor = .pedidosOrangeLight
+        }
+
         availableIndicator.layer.cornerRadius = 6
         availableIndicator.translatesAutoresizingMaskIntoConstraints = false
         

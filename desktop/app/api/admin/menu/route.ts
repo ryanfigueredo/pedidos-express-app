@@ -44,15 +44,32 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ items }, { status: 200 });
 }
 
-// PUT - Atualizar item do cardápio
-export async function PUT(request: NextRequest) {
-  // Permitir acesso via sessão (web) ou API key (app)
+async function checkAdminMenuAuth(request: NextRequest) {
   const session = await import("@/lib/auth-session").then((m) =>
     m.getSession(),
   );
   const authValidation = await validateApiKey(request);
+  let userFromAuth: any = null;
+  const authHeader = request.headers.get("authorization") || request.headers.get("Authorization");
+  if (authHeader?.startsWith("Basic ")) {
+    try {
+      const base64Credentials = authHeader.split(" ")[1];
+      const credentials = Buffer.from(base64Credentials, "base64").toString("utf-8");
+      const [username, password] = credentials.split(":");
+      if (username && password) {
+        const { verifyCredentials } = await import("@/lib/auth-session");
+        userFromAuth = await verifyCredentials(username, password);
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return !!(session || authValidation.isValid || userFromAuth);
+}
 
-  if (!session && !authValidation.isValid) {
+// PUT - Atualizar item do cardápio
+export async function PUT(request: NextRequest) {
+  if (!(await checkAdminMenuAuth(request))) {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
   }
 
@@ -92,13 +109,7 @@ export async function PUT(request: NextRequest) {
 
 // POST - Adicionar novo item
 export async function POST(request: NextRequest) {
-  // Permitir acesso via sessão (web) ou API key (app)
-  const session = await import("@/lib/auth-session").then((m) =>
-    m.getSession(),
-  );
-  const authValidation = await validateApiKey(request);
-
-  if (!session && !authValidation.isValid) {
+  if (!(await checkAdminMenuAuth(request))) {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
   }
 
@@ -147,13 +158,7 @@ export async function POST(request: NextRequest) {
 
 // DELETE - Deletar item do cardápio
 export async function DELETE(request: NextRequest) {
-  // Permitir acesso via sessão (web) ou API key (app)
-  const session = await import("@/lib/auth-session").then((m) =>
-    m.getSession(),
-  );
-  const authValidation = await validateApiKey(request);
-
-  if (!session && !authValidation.isValid) {
+  if (!(await checkAdminMenuAuth(request))) {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
   }
 
@@ -194,13 +199,7 @@ export async function DELETE(request: NextRequest) {
 
 // PATCH - Reordenar itens
 export async function PATCH(request: NextRequest) {
-  // Permitir acesso via sessão (web) ou API key (app)
-  const session = await import("@/lib/auth-session").then((m) =>
-    m.getSession(),
-  );
-  const authValidation = await validateApiKey(request);
-
-  if (!session && !authValidation.isValid) {
+  if (!(await checkAdminMenuAuth(request))) {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
   }
 

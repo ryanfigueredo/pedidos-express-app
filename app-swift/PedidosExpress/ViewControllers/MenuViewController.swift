@@ -9,14 +9,18 @@ class MenuViewController: UIViewController {
     private var allMenuItems: [MenuItem] = []
     private var filteredMenuItems: [MenuItem] = []
     
+    /// Barbeiro: Serviços (Cabelo, Barba, Sobrancelha...) e Combos (ex: Cabelo + Barba + Sobrancelha para o bot oferecer).
     private var categories: [String] {
-        BusinessProvider.isBarber ? ["Cabelo", "Barba", "Combos"] : ["Bebidas", "Comidas", "Sobremesas"]
+        BusinessProvider.isBarber ? ["Serviços", "Combos"] : ["Bebidas", "Comidas", "Sobremesas"]
     }
     private var selectedCategoryIndex = 0
     private let maxItemsPerCategory = 9
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        if BusinessProvider.isBarber {
+            overrideUserInterfaceStyle = .dark
+        }
         let user = AuthService().getUser()
         title = BusinessTypeHelper.menuLabel(for: user)
         navigationItem.largeTitleDisplayMode = .never
@@ -94,9 +98,8 @@ class MenuViewController: UIViewController {
         let categoryMapping: [String: [String]]
         if BusinessProvider.isBarber {
             categoryMapping = [
-                "Cabelo": ["cabelo", "corte", "degradê", "degrade", "cabelos"],
-                "Barba": ["barba", "barbas", "bigode"],
-                "Combos": ["combo", "combos", "pacote", "pacotes", "cabelo e barba"]
+                "Serviços": ["serviços", "servicos", "cabelo", "barba", "sobrancelha", "corte", "degradê", "degrade", "barbas", "bigode"],
+                "Combos": ["combo", "combos", "pacote", "pacotes", "cabelo e barba", "cabelo barba sobrancelha"]
             ]
         } else {
             categoryMapping = [
@@ -106,7 +109,19 @@ class MenuViewController: UIViewController {
             ]
         }
 
-        var filtered = allMenuItems.filter { item in
+        var sourceItems = allMenuItems
+        if BusinessProvider.isBarber {
+            let restaurantCategories: Set<String> = [
+                "bebidas", "bebida", "comidas", "comida", "sobremesas", "sobremesa",
+                "acompanhamento", "acompanhamentos", "hamburguer", "hamburgueres", "doce", "doces"
+            ]
+            sourceItems = allMenuItems.filter { item in
+                let c = item.category.trimmingCharacters(in: .whitespaces).lowercased()
+                return !c.isEmpty && !restaurantCategories.contains(c)
+            }
+        }
+
+        var filtered = sourceItems.filter { item in
             let itemCategory = item.category.trimmingCharacters(in: .whitespaces).lowercased()
             let targetCategories = categoryMapping[selectedCategory] ?? [selectedCategory.lowercased()]
             return targetCategories.contains(itemCategory)
@@ -198,37 +213,71 @@ class MenuViewController: UIViewController {
     }
     
     @objc private func addMenuItem() {
-        let alert = UIAlertController(title: "Novo Item", message: nil, preferredStyle: .alert)
-        
-        alert.addTextField { textField in
-            textField.placeholder = "Nome"
+        if BusinessProvider.isBarber {
+            // Barbeiro: primeiro escolhe a categoria (Serviços ou Combos), depois nome e preço
+            let sheet = UIAlertController(title: "Nova categoria", message: "Onde deseja adicionar o item?", preferredStyle: .actionSheet)
+            for cat in categories {
+                sheet.addAction(UIAlertAction(title: cat, style: .default) { [weak self] _ in
+                    self?.showAddItemAlert(category: cat)
+                })
+            }
+            sheet.addAction(UIAlertAction(title: "Cancelar", style: .cancel))
+            if let popover = sheet.popoverPresentationController {
+                popover.barButtonItem = navigationItem.rightBarButtonItem
+                popover.sourceView = view
+            }
+            present(sheet, animated: true)
+        } else {
+            showAddItemAlert(category: nil)
         }
-        
+    }
+
+    /// Exibe alerta com Nome e Preço. Para barbeiro, category já vem preenchida; para restaurante, pede categoria no alert.
+    private func showAddItemAlert(category: String?) {
+        let alert = UIAlertController(title: category ?? "Novo Item", message: category != nil ? "Nome do serviço ou combo e preço." : nil, preferredStyle: .alert)
+
+        alert.addTextField { textField in
+            textField.placeholder = category == "Serviços" ? "Ex: Cabelo, Barba, Sobrancelha" : (category == "Combos" ? "Ex: Cabelo + Barba + Sobrancelha" : "Nome")
+        }
+
         alert.addTextField { textField in
             textField.placeholder = "Preço"
             textField.keyboardType = .decimalPad
         }
-        
-        alert.addTextField { textField in
-            textField.placeholder = "Categoria"
+
+        if category == nil {
+            alert.addTextField { textField in
+                textField.placeholder = "Categoria (Bebidas, Comidas, Sobremesas)"
+            }
         }
-        
+
+        let finalCategory: String
+        if let cat = category {
+            finalCategory = cat
+        } else {
+            finalCategory = "" // will read from text field
+        }
+
         alert.addAction(UIAlertAction(title: "Adicionar", style: .default) { [weak self] _ in
             guard let nameField = alert.textFields?[0],
                   let priceField = alert.textFields?[1],
-                  let categoryField = alert.textFields?[2],
-                  let name = nameField.text, !name.isEmpty,
+                  let name = nameField.text?.trimmingCharacters(in: .whitespaces), !name.isEmpty,
                   let priceText = priceField.text,
-                  let price = Double(priceText),
-                  let category = categoryField.text, !category.isEmpty else {
+                  let price = Double(priceText.replacingOccurrences(of: ",", with: ".")), price >= 0 else {
                 return
             }
-            
-            self?.createMenuItem(id: UUID().uuidString, name: name, price: price, category: category)
+            let cat: String
+            if !finalCategory.isEmpty {
+                cat = finalCategory
+            } else if let categoryField = alert.textFields?[2], let c = categoryField.text?.trimmingCharacters(in: .whitespaces), !c.isEmpty {
+                cat = c
+            } else {
+                return
+            }
+            self?.createMenuItem(id: UUID().uuidString, name: name, price: price, category: cat)
         })
-        
+
         alert.addAction(UIAlertAction(title: "Cancelar", style: .cancel))
-        
         present(alert, animated: true)
     }
     
@@ -246,7 +295,36 @@ class MenuViewController: UIViewController {
             } catch {
                 await MainActor.run {
                     self.progressIndicator.stopAnimating()
-                    self.showAlert(title: "Erro", message: error.localizedDescription)
+                    var errorTitle = "Erro"
+                    var errorMessage = error.localizedDescription
+                    if let apiError = error as? ApiError {
+                        switch apiError {
+                        case .unauthorized:
+                            errorTitle = "Sessão Expirada"
+                            errorMessage = "Sua sessão expirou. Faça login novamente."
+                        case .networkError(let message):
+                            errorTitle = "Erro de Conexão"
+                            errorMessage = message
+                        case .requestFailed, .invalidURL, .invalidResponse:
+                            errorTitle = "Erro de Conexão"
+                            errorMessage = "Erro ao conectar com o servidor. Verifique sua conexão com a internet."
+                        default:
+                            errorMessage = apiError.localizedDescription ?? "Não foi possível adicionar o item."
+                        }
+                    } else if let urlError = error as? URLError {
+                        errorTitle = "Erro de Conexão"
+                        switch urlError.code {
+                        case .notConnectedToInternet, .networkConnectionLost:
+                            errorMessage = "Sem conexão com a internet. Verifique sua conexão."
+                        case .timedOut:
+                            errorMessage = "Tempo de conexão esgotado. Tente novamente."
+                        case .cannotConnectToHost:
+                            errorMessage = "Não foi possível conectar ao servidor. Verifique sua conexão."
+                        default:
+                            errorMessage = urlError.localizedDescription
+                        }
+                    }
+                    self.showAlert(title: errorTitle, message: errorMessage)
                 }
             }
         }

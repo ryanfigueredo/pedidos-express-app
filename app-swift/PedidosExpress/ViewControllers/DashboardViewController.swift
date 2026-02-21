@@ -21,6 +21,9 @@ class DashboardViewController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        if BusinessProvider.isBarber {
+            overrideUserInterfaceStyle = .dark
+        }
         title = "Dashboard"
         navigationItem.largeTitleDisplayMode = .never
         setupUI()
@@ -48,13 +51,12 @@ class DashboardViewController: UIViewController {
         guard let navBar = navigationController?.navigationBar else { return }
         if BusinessProvider.isBarber {
             navBar.tintColor = .barberPrimary
-            navBar.barTintColor = .barberChrome
-            navBar.isTranslucent = true
+            navBar.barTintColor = .barberNavBackground
+            navBar.isTranslucent = false
             navBar.overrideUserInterfaceStyle = .dark
             let appearance = UINavigationBarAppearance()
-            appearance.configureWithTransparentBackground()
-            appearance.backgroundEffect = UIBlurEffect(style: .dark)
-            appearance.backgroundColor = UIColor.barberChrome.withAlphaComponent(0.72)
+            appearance.configureWithOpaqueBackground()
+            appearance.backgroundColor = .barberNavBackground
             appearance.titleTextAttributes = [.foregroundColor: UIColor.barberPrimary]
             navBar.standardAppearance = appearance
             navBar.scrollEdgeAppearance = appearance
