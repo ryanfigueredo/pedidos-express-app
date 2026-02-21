@@ -58,7 +58,8 @@ interface Stats {
   totalRestaurants?: number;
 }
 
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
+const fetcher = (url: string) =>
+  fetch(url, { credentials: "include" }).then((res) => res.json());
 
 export default function DashboardPage() {
   // Verificar se é super admin e redirecionar

@@ -16,9 +16,19 @@ async function getTenantIdFromRequest(
   try {
     const { getSession } = await import("@/lib/auth-session");
     const session = await getSession();
-    if (session?.tenant_id) {
-      tenantId = session.tenant_id;
-      return tenantId;
+    if (session?.id) {
+      if (session.tenant_id) {
+        return session.tenant_id;
+      }
+      // Cookie antigo pode não ter tenant_id: buscar no banco
+      const user = await prisma.user.findUnique({
+        where: { id: session.id },
+        select: { tenant_id: true },
+      });
+      if (user?.tenant_id) {
+        return user.tenant_id;
+      }
+      // Super admin sem tenant: não usar fallback aqui, deixar para baixo (retorna null e depois default)
     }
   } catch (_) {}
 
