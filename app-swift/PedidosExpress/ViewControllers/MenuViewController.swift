@@ -9,17 +9,18 @@ class MenuViewController: UIViewController {
     private var allMenuItems: [MenuItem] = []
     private var filteredMenuItems: [MenuItem] = []
     
-    private let categories = ["Bebidas", "Comidas", "Sobremesas"]
+    private var categories: [String] {
+        BusinessProvider.isBarber ? ["Cabelo", "Barba", "Combos"] : ["Bebidas", "Comidas", "Sobremesas"]
+    }
     private var selectedCategoryIndex = 0
     private let maxItemsPerCategory = 9
-    
+
     override func viewDidLoad() {
         super.viewDidLoad()
-        let authService = AuthService()
-        let user = authService.getUser()
+        let user = AuthService().getUser()
         title = BusinessTypeHelper.menuLabel(for: user)
         navigationItem.largeTitleDisplayMode = .never
-        
+
         setupUI()
         setupTableView()
         loadMenu()
@@ -32,32 +33,31 @@ class MenuViewController: UIViewController {
     }
     
     private func setupUI() {
-        view.backgroundColor = .pedidosOrangeLight
-        
-        // Segmented Control (Tabs)
+        view.backgroundColor = BusinessProvider.backgroundColor
+
         segmentedControl = UISegmentedControl(items: categories)
         segmentedControl.selectedSegmentIndex = 0
-        segmentedControl.backgroundColor = .systemBackground
-        segmentedControl.selectedSegmentTintColor = .pedidosOrange
-        // Texto branco quando selecionado para melhor contraste
+        segmentedControl.backgroundColor = BusinessProvider.isBarber ? .barberCard : .systemBackground
+        segmentedControl.selectedSegmentTintColor = BusinessProvider.primaryColor
         segmentedControl.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .selected)
-        segmentedControl.setTitleTextAttributes([.foregroundColor: UIColor.pedidosTextSecondary], for: .normal)
+        segmentedControl.setTitleTextAttributes([.foregroundColor: BusinessProvider.textSecondaryColor], for: .normal)
         segmentedControl.addTarget(self, action: #selector(categoryChanged), for: .valueChanged)
         segmentedControl.translatesAutoresizingMaskIntoConstraints = false
-        
+
         let segmentedContainer = UIView()
-        segmentedContainer.backgroundColor = .systemBackground
+        segmentedContainer.backgroundColor = BusinessProvider.isBarber ? .barberBackground : .systemBackground
         segmentedContainer.translatesAutoresizingMaskIntoConstraints = false
         segmentedContainer.addSubview(segmentedControl)
-        
+
         menuTableView = UITableView()
-        menuTableView.backgroundColor = .pedidosOrangeLight
+        menuTableView.backgroundColor = BusinessProvider.backgroundColor
         menuTableView.translatesAutoresizingMaskIntoConstraints = false
         
         progressIndicator = UIActivityIndicatorView(style: .large)
         progressIndicator.translatesAutoresizingMaskIntoConstraints = false
         progressIndicator.hidesWhenStopped = true
-        
+        progressIndicator.color = BusinessProvider.primaryColor
+
         view.addSubview(segmentedContainer)
         view.addSubview(menuTableView)
         view.addSubview(progressIndicator)
@@ -90,15 +90,22 @@ class MenuViewController: UIViewController {
     
     private func filterMenuItems() {
         let selectedCategory = categories[selectedCategoryIndex]
-        
-        // Mapear categorias do backend para as categorias do app
-        let categoryMapping: [String: [String]] = [
-            "Bebidas": ["bebida", "bebidas"],
-            "Comidas": ["hamburguer", "hamburgueres", "comida", "comidas", "acompanhamento", "acompanhamentos"],
-            "Sobremesas": ["sobremesa", "sobremesas", "doce", "doces"]
-        ]
-        
-        // Filtrar por categoria (case-insensitive e normalizar)
+
+        let categoryMapping: [String: [String]]
+        if BusinessProvider.isBarber {
+            categoryMapping = [
+                "Cabelo": ["cabelo", "corte", "degradê", "degrade", "cabelos"],
+                "Barba": ["barba", "barbas", "bigode"],
+                "Combos": ["combo", "combos", "pacote", "pacotes", "cabelo e barba"]
+            ]
+        } else {
+            categoryMapping = [
+                "Bebidas": ["bebida", "bebidas"],
+                "Comidas": ["hamburguer", "hamburgueres", "comida", "comidas", "acompanhamento", "acompanhamentos"],
+                "Sobremesas": ["sobremesa", "sobremesas", "doce", "doces"]
+            ]
+        }
+
         var filtered = allMenuItems.filter { item in
             let itemCategory = item.category.trimmingCharacters(in: .whitespaces).lowercased()
             let targetCategories = categoryMapping[selectedCategory] ?? [selectedCategory.lowercased()]

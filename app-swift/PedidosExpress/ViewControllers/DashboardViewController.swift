@@ -4,13 +4,16 @@ class DashboardViewController: UIViewController {
     private var scrollView: UIScrollView!
     private var contentView: UIView!
     
-    // Labels para KPIs
+    // Labels para KPIs (restaurante: todos; barbeiro: hoje/semana + horários ocupados / próximo cliente)
     private var todayOrdersLabel: UILabel!
     private var todayRevenueLabel: UILabel!
     private var avgTicketLabel: UILabel!
     private var pendingOrdersLabel: UILabel!
+    private var occupiedSlotsLabel: UILabel!
+    private var nextClientLabel: UILabel!
     private var weekOrdersLabel: UILabel!
     private var weekRevenueLabel: UILabel!
+    private var row2Stack: UIStackView?
     
     private var progressIndicator: UIActivityIndicatorView!
     
@@ -26,40 +29,66 @@ class DashboardViewController: UIViewController {
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        view.backgroundColor = BusinessProvider.backgroundColor
+        applyNavigationBarTheme()
         loadStats()
+    }
+
+    private func applyNavigationBarTheme() {
+        guard let navBar = navigationController?.navigationBar else { return }
+        if BusinessProvider.isBarber {
+            navBar.tintColor = .barberPrimary
+            navBar.barTintColor = .barberBackground
+            let appearance = UINavigationBarAppearance()
+            appearance.configureWithOpaqueBackground()
+            appearance.backgroundColor = .barberBackground
+            appearance.titleTextAttributes = [.foregroundColor: UIColor.barberPrimary]
+            navBar.standardAppearance = appearance
+            navBar.scrollEdgeAppearance = appearance
+        } else {
+            navBar.tintColor = .pedidosOrange
+            navBar.barTintColor = .systemBackground
+            let appearance = UINavigationBarAppearance()
+            appearance.configureWithOpaqueBackground()
+            appearance.backgroundColor = .systemBackground
+            appearance.titleTextAttributes = [.foregroundColor: UIColor.pedidosOrange]
+            navBar.standardAppearance = appearance
+            navBar.scrollEdgeAppearance = appearance
+        }
     }
     
     private func setupUI() {
-        view.backgroundColor = .pedidosOrangeLight
-        
-        // Scroll View
+        view.backgroundColor = BusinessProvider.backgroundColor
+
         scrollView = UIScrollView()
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.showsVerticalScrollIndicator = false
-        
+
         contentView = UIView()
         contentView.translatesAutoresizingMaskIntoConstraints = false
-        
+
         scrollView.addSubview(contentView)
         view.addSubview(scrollView)
-        
-        // Stack para cards de KPIs
+
         let kpiStack = UIStackView()
         kpiStack.axis = .vertical
         kpiStack.spacing = 16
         kpiStack.translatesAutoresizingMaskIntoConstraints = false
-        
-        // Primeira linha: Pedidos Hoje e Receita Hoje
+
+        let user = AuthService().getUser()
+        let isBarber = BusinessProvider.isBarber
+
+        // Primeira linha: Pedidos/Agendamentos Hoje e Receita Hoje
         let row1 = createKPIStack()
         let card1 = createKPICard(
             icon: "cart.fill",
             value: "0",
-            title: BusinessTypeHelper.ordersTodayLabel(for: AuthService().getUser()),
-            gradientStart: .gradientOrangeStart,
-            gradientEnd: .gradientOrangeEnd
+            title: BusinessTypeHelper.ordersTodayLabel(for: user),
+            gradientStart: isBarber ? .barberPrimary : .gradientOrangeStart,
+            gradientEnd: isBarber ? .barberPrimary : .gradientOrangeEnd
         )
         todayOrdersLabel = card1.valueLabel
-        
+
         let card2 = createKPICard(
             icon: "dollarsign.circle.fill",
             value: "R$ 0,00",
@@ -68,45 +97,71 @@ class DashboardViewController: UIViewController {
             gradientEnd: .gradientGreenEnd
         )
         todayRevenueLabel = card2.valueLabel
-        
+
         row1.addArrangedSubview(card1.container)
         row1.addArrangedSubview(card2.container)
-        
-        // Segunda linha: Ticket Médio e Pendentes
-        let row2 = createKPIStack()
-        let card3 = createKPICard(
-            icon: "receipt.fill",
-            value: "R$ 0,00",
-            title: "Ticket Médio",
-            gradientStart: .gradientPurpleStart,
-            gradientEnd: .gradientPurpleEnd
-        )
-        avgTicketLabel = card3.valueLabel
-        
-        let card4 = createKPICard(
-            icon: "clock.fill",
-            value: "0",
-            title: "Pendentes",
-            gradientStart: .gradientRedStart,
-            gradientEnd: .gradientRedEnd
-        )
-        pendingOrdersLabel = card4.valueLabel
-        
-        row2.addArrangedSubview(card3.container)
-        row2.addArrangedSubview(card4.container)
-        
+
         kpiStack.addArrangedSubview(row1)
+
+        // Segunda linha: Restaurante = Ticket Médio + Pendentes; Barbeiro = Horários Ocupados + Próximo Cliente
+        let row2 = createKPIStack()
+        row2Stack = row2
+        if isBarber {
+            let card3 = createKPICard(
+                icon: "calendar.badge.clock",
+                value: "0",
+                title: "Horários Ocupados",
+                gradientStart: .barberPrimary,
+                gradientEnd: .barberPrimary
+            )
+            occupiedSlotsLabel = card3.valueLabel
+
+            let card4 = createKPICard(
+                icon: "person.fill",
+                value: "—",
+                title: "Próximo Cliente",
+                gradientStart: .barberCard,
+                gradientEnd: .barberCard
+            )
+            nextClientLabel = card4.valueLabel
+            card4.container.backgroundColor = .barberCard
+
+            row2.addArrangedSubview(card3.container)
+            row2.addArrangedSubview(card4.container)
+        } else {
+            let card3 = createKPICard(
+                icon: "receipt.fill",
+                value: "R$ 0,00",
+                title: "Ticket Médio",
+                gradientStart: .gradientPurpleStart,
+                gradientEnd: .gradientPurpleEnd
+            )
+            avgTicketLabel = card3.valueLabel
+
+            let card4 = createKPICard(
+                icon: "clock.fill",
+                value: "0",
+                title: "Pendentes",
+                gradientStart: .gradientRedStart,
+                gradientEnd: .gradientRedEnd
+            )
+            pendingOrdersLabel = card4.valueLabel
+
+            row2.addArrangedSubview(card3.container)
+            row2.addArrangedSubview(card4.container)
+        }
+
         kpiStack.addArrangedSubview(row2)
-        
-        // Card da Semana
+
         let weekCard = createWeekCard()
-        
+
         contentView.addSubview(kpiStack)
         contentView.addSubview(weekCard)
         
         progressIndicator = UIActivityIndicatorView(style: .large)
         progressIndicator.translatesAutoresizingMaskIntoConstraints = false
         progressIndicator.hidesWhenStopped = true
+        progressIndicator.color = BusinessProvider.isBarber ? .barberPrimary : .pedidosOrange
         view.addSubview(progressIndicator)
         
         NSLayoutConstraint.activate([
@@ -145,18 +200,19 @@ class DashboardViewController: UIViewController {
     
     private func createKPICard(icon: String, value: String, title: String, gradientStart: UIColor, gradientEnd: UIColor) -> (container: UIView, valueLabel: UILabel) {
         let container = UIView()
-        container.backgroundColor = .systemBackground
-        container.layer.cornerRadius = 16
+        container.backgroundColor = BusinessProvider.cardBackgroundColor
+        container.layer.cornerRadius = BusinessProvider.cardCornerRadius
         container.layer.shadowColor = UIColor.black.cgColor
         container.layer.shadowOffset = CGSize(width: 0, height: 4)
         container.layer.shadowRadius = 8
-        container.layer.shadowOpacity = 0.1
+        container.layer.shadowOpacity = BusinessProvider.isBarber ? 0.2 : 0.1
         container.translatesAutoresizingMaskIntoConstraints = false
-        
+
         let gradientView = GradientView()
         gradientView.startColor = gradientStart
         gradientView.endColor = gradientEnd
         gradientView.direction = .diagonal
+        gradientView.cornerRadius = BusinessProvider.cardCornerRadius
         gradientView.translatesAutoresizingMaskIntoConstraints = false
         
         let iconImageView = UIImageView()
@@ -205,29 +261,29 @@ class DashboardViewController: UIViewController {
     
     private func createWeekCard() -> UIView {
         let card = UIView()
-        card.backgroundColor = .systemBackground
-        card.layer.cornerRadius = 16
+        card.backgroundColor = BusinessProvider.cardBackgroundColor
+        card.layer.cornerRadius = BusinessProvider.cardCornerRadius
         card.layer.shadowColor = UIColor.black.cgColor
         card.layer.shadowOffset = CGSize(width: 0, height: 4)
         card.layer.shadowRadius = 8
-        card.layer.shadowOpacity = 0.1
+        card.layer.shadowOpacity = BusinessProvider.isBarber ? 0.2 : 0.1
         card.translatesAutoresizingMaskIntoConstraints = false
-        
+
         let titleLabel = UILabel()
         titleLabel.text = "Esta Semana"
         titleLabel.font = .systemFont(ofSize: 20, weight: .bold)
-        titleLabel.textColor = .pedidosOrange
+        titleLabel.textColor = BusinessProvider.primaryColor
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        
+
         weekOrdersLabel = UILabel()
         weekOrdersLabel.text = "0"
         weekOrdersLabel.font = .systemFont(ofSize: 18, weight: .bold)
-        weekOrdersLabel.textColor = .pedidosTextPrimary
-        
+        weekOrdersLabel.textColor = BusinessProvider.textPrimaryColor
+
         weekRevenueLabel = UILabel()
         weekRevenueLabel.text = "R$ 0,00"
         weekRevenueLabel.font = .systemFont(ofSize: 18, weight: .bold)
-        weekRevenueLabel.textColor = .pedidosTextPrimary
+        weekRevenueLabel.textColor = BusinessProvider.textPrimaryColor
         
         let user = AuthService().getUser()
         let ordersLabel = BusinessTypeHelper.ordersLabel(for: user)
@@ -257,7 +313,7 @@ class DashboardViewController: UIViewController {
         let labelView = UILabel()
         labelView.text = label
         labelView.font = .systemFont(ofSize: 16)
-        labelView.textColor = .pedidosTextSecondary
+        labelView.textColor = BusinessProvider.textSecondaryColor
         
         valueLabel.translatesAutoresizingMaskIntoConstraints = false
         labelView.translatesAutoresizingMaskIntoConstraints = false
@@ -326,30 +382,33 @@ class DashboardViewController: UIViewController {
         print("📊 Dashboard.updateUI: today.orders=\(stats.today.orders), today.revenue=\(stats.today.revenue)")
         print("   week.orders=\(stats.week.orders), week.revenue=\(stats.week.revenue), pending=\(stats.pendingOrders)")
         #endif
-        
+
         todayOrdersLabel.text = "\(stats.today.orders)"
-        
+
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
         formatter.locale = Locale(identifier: "pt_BR")
         formatter.currencySymbol = "R$"
-        
+
         let todayRevenueText = formatter.string(from: NSNumber(value: stats.today.revenue)) ?? "R$ 0,00"
         todayRevenueLabel.text = todayRevenueText
-        
+
         weekOrdersLabel.text = "\(stats.week.orders)"
         let weekRevenueText = formatter.string(from: NSNumber(value: stats.week.revenue)) ?? "R$ 0,00"
         weekRevenueLabel.text = weekRevenueText
-        
-        pendingOrdersLabel.text = "\(stats.pendingOrders)"
-        
-        // Calcular ticket médio
-        let avgTicket = stats.today.orders > 0 ? stats.today.revenue / Double(stats.today.orders) : 0.0
-        let avgTicketText = formatter.string(from: NSNumber(value: avgTicket)) ?? "R$ 0,00"
-        avgTicketLabel.text = avgTicketText
-        
+
+        if BusinessProvider.isBarber {
+            occupiedSlotsLabel?.text = "\(stats.today.orders)"
+            nextClientLabel?.text = "—"
+        } else {
+            pendingOrdersLabel?.text = "\(stats.pendingOrders)"
+            let avgTicket = stats.today.orders > 0 ? stats.today.revenue / Double(stats.today.orders) : 0.0
+            let avgTicketText = formatter.string(from: NSNumber(value: avgTicket)) ?? "R$ 0,00"
+            avgTicketLabel?.text = avgTicketText
+        }
+
         #if DEBUG
-        print("   📊 Labels atualizados: hoje=\(todayRevenueText), semana=\(weekRevenueText), ticket=\(avgTicketText)")
+        print("   📊 Labels atualizados: hoje=\(todayRevenueText), semana=\(weekRevenueText)")
         #endif
     }
     

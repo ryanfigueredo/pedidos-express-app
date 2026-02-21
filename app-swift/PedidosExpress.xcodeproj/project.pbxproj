@@ -33,6 +33,9 @@
 		AA000037 /* LogoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000038 /* LogoView.swift */; };
 		AA000039 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA000040 /* LaunchScreen.storyboard */; };
 		AA000044 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000045 /* Assets.xcassets */; };
+		AA0000A1 /* ScheduleViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000A0 /* ScheduleViewController.swift */; };
+		AA0000B1 /* BusinessProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000B0 /* BusinessProvider.swift */; };
+		AA0000B3 /* AppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000B2 /* AppRouter.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -64,6 +67,9 @@
 		AA000042 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		AA000043 /* PedidosExpress.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PedidosExpress.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA000045 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		AA0000A0 /* ScheduleViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleViewController.swift; sourceTree = "<group>"; };
+		AA0000B0 /* BusinessProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusinessProvider.swift; sourceTree = "<group>"; };
+		AA0000B2 /* AppRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRouter.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -132,6 +138,7 @@
 				AA000010 /* OrdersViewController.swift */,
 				AA000014 /* MenuViewController.swift */,
 				AA000016 /* SettingsViewController.swift */,
+				AA0000A0 /* ScheduleViewController.swift */,
 				AA000018 /* SupportViewController.swift */,
 			);
 			path = ViewControllers;
@@ -163,6 +170,8 @@
 			isa = PBXGroup;
 			children = (
 				A28758CA2F34E92700E0B5CB /* BusinessTypeHelper.swift */,
+				AA0000B0 /* BusinessProvider.swift */,
+				AA0000B2 /* AppRouter.swift */,
 			);
 			path = Helpers;
 			sourceTree = "<group>";
@@ -249,6 +258,7 @@
 				AA000007 /* MainNavigationViewController.swift in Sources */,
 				A28758C72F34E90800E0B5CB /* ChatMessage.swift in Sources */,
 				AA000009 /* OrdersViewController.swift in Sources */,
+				AA0000A1 /* ScheduleViewController.swift in Sources */,
 				AA000013 /* MenuViewController.swift in Sources */,
 				AA000015 /* SettingsViewController.swift in Sources */,
 				AA000017 /* SupportViewController.swift in Sources */,
@@ -264,6 +274,8 @@
 				AA000033 /* MenuItem.swift in Sources */,
 				AA000035 /* Dashboard.swift in Sources */,
 				A28758CB2F34E92800E0B5CB /* BusinessTypeHelper.swift in Sources */,
+				AA0000B1 /* BusinessProvider.swift in Sources */,
+				AA0000B3 /* AppRouter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

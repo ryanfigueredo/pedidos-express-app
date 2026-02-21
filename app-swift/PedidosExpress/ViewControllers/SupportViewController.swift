@@ -9,23 +9,24 @@ class SupportViewController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "Suporte"
+        title = BusinessProvider.isBarber ? "Atendimento" : "Suporte"
         navigationItem.largeTitleDisplayMode = .never
         setupUI()
         setupTableView()
         loadConversations()
     }
-    
+
     private func setupUI() {
-        view.backgroundColor = .pedidosOrangeLight
-        
+        view.backgroundColor = BusinessProvider.backgroundColor
+
         conversationsTableView = UITableView()
         conversationsTableView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(conversationsTableView)
-        
+
         progressIndicator = UIActivityIndicatorView(style: .large)
         progressIndicator.translatesAutoresizingMaskIntoConstraints = false
         progressIndicator.hidesWhenStopped = true
+        progressIndicator.color = BusinessProvider.primaryColor
         view.addSubview(progressIndicator)
         
         NSLayoutConstraint.activate([
@@ -47,7 +48,7 @@ class SupportViewController: UIViewController {
     private func setupTableView() {
         conversationsTableView.delegate = self
         conversationsTableView.dataSource = self
-        conversationsTableView.backgroundColor = .pedidosOrangeLight
+        conversationsTableView.backgroundColor = BusinessProvider.backgroundColor
         conversationsTableView.register(UITableViewCell.self, forCellReuseIdentifier: "ConversationCell")
     }
     
@@ -79,7 +80,7 @@ class SupportViewController: UIViewController {
                         let emptyLabel = UILabel()
                         emptyLabel.text = "Nenhuma conversa prioritária no momento"
                         emptyLabel.textAlignment = .center
-                        emptyLabel.textColor = .secondaryLabel
+                        emptyLabel.textColor = BusinessProvider.textSecondaryColor
                         emptyLabel.tag = 999 // Tag para identificar e remover depois
                         emptyLabel.translatesAutoresizingMaskIntoConstraints = false
                         self.view.addSubview(emptyLabel)
@@ -144,11 +145,14 @@ extension SupportViewController: UITableViewDataSource, UITableViewDelegate {
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "ConversationCell", for: indexPath)
         let conversation = conversations[indexPath.row]
-        
+
         cell.textLabel?.text = conversation.phoneFormatted
         cell.detailTextLabel?.text = "Tempo de espera: \(conversation.waitTime) min"
         cell.accessoryType = .disclosureIndicator
-        
+        cell.backgroundColor = BusinessProvider.cardBackgroundColor
+        cell.textLabel?.textColor = BusinessProvider.textPrimaryColor
+        cell.detailTextLabel?.textColor = BusinessProvider.textSecondaryColor
+
         return cell
     }
     

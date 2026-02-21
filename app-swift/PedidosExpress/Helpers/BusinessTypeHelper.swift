@@ -1,24 +1,41 @@
 import Foundation
 
 /**
- * Helper para obter labels dinâmicos baseados no tipo de negócio
+ * Helper para obter labels dinâmicos baseados no tipo de negócio.
+ * Considera AuthService.getBusinessType() quando o User não traz business_type (ex.: backend não envia).
  */
 class BusinessTypeHelper {
+    private static var effectiveIsBarber: Bool {
+        AuthService().getBusinessType()?.uppercased() == "BARBEIRO"
+    }
+
+    private static var effectiveIsDentista: Bool {
+        AuthService().getBusinessType()?.uppercased() == "DENTISTA"
+    }
+
     static func getLabel(for user: User?, defaultLabel: String, dentistaLabel: String) -> String {
-        guard let user = user else {
-            return defaultLabel
-        }
-        let useAgendaLabel = user.isDentista || user.isBarbeiro
+        let useAgendaLabel = (user?.isDentista ?? effectiveIsDentista) || (user?.isBarbeiro ?? effectiveIsBarber)
         return useAgendaLabel ? dentistaLabel : defaultLabel
     }
-    
-    // Labels principais
+
     static func ordersLabel(for user: User?) -> String {
         return getLabel(for: user, defaultLabel: "Pedidos", dentistaLabel: "Agendamentos")
     }
-    
+
+    static func agendaTabLabel(for user: User?) -> String {
+        if user?.isBarbeiro == true || effectiveIsBarber { return "Agenda" }
+        if user?.isDentista == true || effectiveIsDentista { return "Agendamentos" }
+        return "Pedidos"
+    }
+
+    static func supportTabLabel(for user: User?) -> String {
+        return (user?.isBarbeiro == true || effectiveIsBarber) ? "Atendimento" : "Suporte"
+    }
+
     static func menuLabel(for user: User?) -> String {
-        return getLabel(for: user, defaultLabel: "Cardápio", dentistaLabel: "Procedimentos")
+        if user?.isBarbeiro == true || effectiveIsBarber { return "Serviços" }
+        if user?.isDentista == true || effectiveIsDentista { return "Procedimentos" }
+        return "Cardápio"
     }
     
     static func orderLabel(for user: User?) -> String {

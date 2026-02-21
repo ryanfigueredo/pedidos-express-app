@@ -21,9 +21,8 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         print("🔐 Usuário logado: \(isLoggedIn)")
         
         if isLoggedIn {
-            let mainVC = MainNavigationViewController()
-            print("✅ MainNavigationViewController criado programaticamente")
-            window?.rootViewController = mainVC
+            window?.rootViewController = AppRouter.showMainInterface()
+            print("✅ AppRouter: interface principal (tabs) definida como root")
         } else {
             let loginVC = LoginViewController()
             print("✅ LoginViewController criado programaticamente")

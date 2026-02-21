@@ -287,19 +287,14 @@ class LoginViewController: UIViewController {
         Task {
             do {
                 let user = try await apiService.login(username: username, password: password)
-                
-                // Sempre salvar credenciais para que as requisições funcionem
-                // O switch controla apenas se preenche automaticamente na próxima vez
-                authService.saveUser(user, username: username, password: password)
-                
-                // Se não marcar "salvar senha", não preencher automaticamente na próxima vez
-                // mas ainda salvar para que as requisições funcionem
-                if !savePasswordSwitch.isOn {
-                    // Não fazer nada - as credenciais já foram salvas
-                    // Na próxima vez, o usuário terá que digitar novamente
-                }
-                
+
                 await MainActor.run {
+                    // Salvar user (com business_type) e credenciais no MainActor para que BusinessProvider
+                    // e getCredentials retornem dados antes de trocar a root da window.
+                    authService.saveUser(user, username: username, password: password)
+                    if !self.savePasswordSwitch.isOn {
+                        authService.saveUserWithoutPassword(user, username: username)
+                    }
                     progressIndicator.stopAnimating()
                     progressIndicator.isHidden = true
                     loginButton.isEnabled = true
@@ -335,17 +330,12 @@ class LoginViewController: UIViewController {
     
     private func navigateToMain() {
         guard isViewLoaded && view.window != nil else {
-            // Se a view não estiver pronta, aguardar
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
                 self?.navigateToMain()
             }
             return
         }
-        
-        let mainVC = MainNavigationViewController()
-            let navController = UINavigationController(rootViewController: mainVC)
-            navController.modalPresentationStyle = .fullScreen
-            present(navController, animated: true)
+        AppRouter.setRootToMainInterface()
     }
     
     private func showAlert(title: String, message: String) {

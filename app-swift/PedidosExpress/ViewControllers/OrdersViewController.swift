@@ -71,8 +71,8 @@ class OrdersViewController: UIViewController {
     }
     
     private func setupUI() {
-        view.backgroundColor = .pedidosOrangeLight
-        
+        view.backgroundColor = BusinessProvider.backgroundColor
+
         // Barbeiro: label "Horários livres hoje" (só aparecem os que ainda não foram marcados)
         let authService = AuthService()
         let user = authService.getUser()
@@ -99,7 +99,7 @@ class OrdersViewController: UIViewController {
         
         // Table View
         ordersTableView = UITableView()
-        ordersTableView.backgroundColor = .pedidosOrangeLight
+        ordersTableView.backgroundColor = BusinessProvider.backgroundColor
         ordersTableView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(ordersTableView)
         
@@ -107,6 +107,7 @@ class OrdersViewController: UIViewController {
         progressIndicator = UIActivityIndicatorView(style: .large)
         progressIndicator.translatesAutoresizingMaskIntoConstraints = false
         progressIndicator.hidesWhenStopped = true
+        progressIndicator.color = BusinessProvider.primaryColor
         view.addSubview(progressIndicator)
         
         // Refresh Control
@@ -156,9 +157,35 @@ class OrdersViewController: UIViewController {
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        view.backgroundColor = BusinessProvider.backgroundColor
+        ordersTableView?.backgroundColor = BusinessProvider.backgroundColor
+        applyNavigationBarTheme()
         let authService = AuthService()
         if authService.getUser()?.isBarbeiro != true {
             updatePrinterButtonTitle()
+        }
+    }
+
+    private func applyNavigationBarTheme() {
+        guard let navBar = navigationController?.navigationBar else { return }
+        if BusinessProvider.isBarber {
+            navBar.tintColor = .barberPrimary
+            navBar.barTintColor = .barberBackground
+            let appearance = UINavigationBarAppearance()
+            appearance.configureWithOpaqueBackground()
+            appearance.backgroundColor = .barberBackground
+            appearance.titleTextAttributes = [.foregroundColor: UIColor.barberPrimary]
+            navBar.standardAppearance = appearance
+            navBar.scrollEdgeAppearance = appearance
+        } else {
+            navBar.tintColor = .pedidosOrange
+            navBar.barTintColor = .systemBackground
+            let appearance = UINavigationBarAppearance()
+            appearance.configureWithOpaqueBackground()
+            appearance.backgroundColor = .systemBackground
+            appearance.titleTextAttributes = [.foregroundColor: UIColor.pedidosOrange]
+            navBar.standardAppearance = appearance
+            navBar.scrollEdgeAppearance = appearance
         }
     }
     
@@ -360,8 +387,8 @@ class OrdersViewController: UIViewController {
                 if user?.isBarbeiro == true {
                     // Barbeiro: ordenar por data do agendamento (appointment_date) quando existir
                     sortedOrders = response.orders.sorted {
-                        let d1 = $0.appointmentDate.flatMap { ISO8601DateFormatter().date(from: $0) } ?? ISO8601DateFormatter().date(from: $0.createdAt) ?? Date.distantPast
-                        let d2 = $1.appointmentDate.flatMap { ISO8601DateFormatter().date(from: $1) } ?? ISO8601DateFormatter().date(from: $1.createdAt) ?? Date.distantPast
+                        let d1 = $0.appointmentDate.flatMap { s in ISO8601DateFormatter().date(from: s) } ?? ISO8601DateFormatter().date(from: $0.createdAt) ?? Date.distantPast
+                        let d2 = $1.appointmentDate.flatMap { s in ISO8601DateFormatter().date(from: s) } ?? ISO8601DateFormatter().date(from: $1.createdAt) ?? Date.distantPast
                         return d1 < d2
                     }
                 } else {

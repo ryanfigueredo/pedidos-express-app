@@ -54,12 +54,26 @@ class MenuItemTableViewCell: UITableViewCell {
     func configure(with item: MenuItem) {
         nameLabel.text = item.name
         categoryLabel.text = item.category
-        
+
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
         formatter.locale = Locale(identifier: "pt_BR")
         priceLabel.text = formatter.string(from: NSNumber(value: item.price))
-        
+
         availableIndicator.backgroundColor = item.available ? .systemGreen : .systemRed
+
+        if BusinessProvider.isBarber {
+            nameLabel.textColor = .barberTextPrimary
+            categoryLabel.textColor = .barberTextSecondary
+            priceLabel.textColor = .barberPrimary
+            contentView.backgroundColor = .barberCard
+            backgroundColor = .barberBackground
+        } else {
+            nameLabel.textColor = .pedidosTextPrimary
+            categoryLabel.textColor = .secondaryLabel
+            priceLabel.textColor = .systemGreen
+            contentView.backgroundColor = .pedidosOrangeLight
+            backgroundColor = .pedidosOrangeLight
+        }
     }
 }

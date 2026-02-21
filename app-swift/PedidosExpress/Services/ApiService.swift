@@ -150,11 +150,14 @@ class ApiService {
                 
                 if let json = try JSONSerialization.jsonObject(with: altData) as? [String: Any],
                    let success = json["success"] as? Bool, success,
-                   let userData = json["user"] as? [String: Any] {
+                   var userData = json["user"] as? [String: Any] {
+                    if userData["business_type"] == nil, let topLevel = json["business_type"] as? String {
+                        userData["business_type"] = topLevel
+                    }
                     let userJson = try JSONSerialization.data(withJSONObject: userData)
                     let user = try decoder.decode(User.self, from: userJson)
                     #if DEBUG
-                    print("✅ ApiService.login: Login bem-sucedido!")
+                    print("✅ ApiService.login: Login bem-sucedido! business_type: \(user.businessType ?? "nil")")
                     #endif
                     return user
                 }
@@ -171,11 +174,14 @@ class ApiService {
             
             if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                let success = json["success"] as? Bool, success,
-               let userData = json["user"] as? [String: Any] {
+               var userData = json["user"] as? [String: Any] {
+                if userData["business_type"] == nil, let topLevel = json["business_type"] as? String {
+                    userData["business_type"] = topLevel
+                }
                 let userJson = try JSONSerialization.data(withJSONObject: userData)
                 let user = try decoder.decode(User.self, from: userJson)
                 #if DEBUG
-                print("✅ ApiService.login: Login bem-sucedido!")
+                print("✅ ApiService.login: Login bem-sucedido! business_type: \(user.businessType ?? "nil")")
                 #endif
                 return user
             }

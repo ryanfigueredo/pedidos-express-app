@@ -26,6 +26,7 @@ Cada componente possui seu próprio repositório Git:
 ## 🚀 Início Rápido
 
 ### API & Web Dashboard
+
 ```bash
 cd desktop
 npm install
@@ -33,18 +34,21 @@ npm run dev
 ```
 
 ### App Android
+
 ```bash
 cd app-kotlin/android
 # Abra no Android Studio
 ```
 
 ### App iOS
+
 ```bash
 cd app-swift
 open PedidosExpress.xcodeproj
 ```
 
 ### Bot WhatsApp
+
 ```bash
 cd bot
 npm install
@@ -59,35 +63,6 @@ Cada projeto possui seu próprio README com instruções detalhadas:
 - [App Android](./app-kotlin/README.md)
 - [App iOS](./app-swift/README.md)
 - [Bot WhatsApp](./bot/README.md)
-
-## 🏗️ Arquitetura
-
-```
-┌─────────────────┐
-│   Mobile Apps    │
-│  (Android/iOS)  │
-└────────┬─────────┘
-         │
-         ▼
-┌─────────────────┐
-│   API Backend    │
-│   (Next.js)      │
-└────────┬─────────┘
-         │
-    ┌────┴────┐
-    │         │
-    ▼         ▼
-┌────────┐ ┌──────────┐
-│Postgres│ │ DynamoDB │
-│  (DB)  │ │ (Bot)    │
-└────────┘ └────┬─────┘
-                │
-                ▼
-         ┌──────────┐
-         │  Bot     │
-         │ WhatsApp │
-         └──────────┘
-```
 
 ## 🔧 Tecnologias Principais
 
