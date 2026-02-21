@@ -1,8 +1,14 @@
 import Foundation
 
 class ApiService {
-    private let baseURL = "https://pedidos.dmtn.com.br"
-    
+    /// Base URL da API. Lê de Info.plist "ApiBaseURL" ou usa padrão.
+    private var baseURL: String {
+        let raw = (Bundle.main.object(forInfoDictionaryKey: "ApiBaseURL") as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/")) ?? ""
+        return raw.isEmpty ? "https://pedidos.dmtn.com.br" : raw
+    }
+
     private let authService = AuthService()
     private let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
@@ -477,7 +483,36 @@ class ApiService {
             throw ApiError.requestFailed
         }
     }
-    
+
+    /// Cria um agendamento manual (cliente agendado pessoalmente, fora do WhatsApp).
+    func createAppointment(customerName: String, customerPhone: String, appointmentDate: String) async throws {
+        let url = "\(baseURL)/api/orders"
+        let bodyDict: [String: Any] = [
+            "customer_name": customerName,
+            "customer_phone": customerPhone.isEmpty ? "local" : customerPhone,
+            "order_type": "appointment",
+            "appointment_date": appointmentDate,
+            "items": [] as [[String: Any]],
+            "total_price": 0.0
+        ]
+        let body = try JSONSerialization.data(withJSONObject: bodyDict)
+
+        guard let request = buildRequest(url: url, method: "POST", body: body) else {
+            throw ApiError.unauthorized
+        }
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else { throw ApiError.invalidResponse }
+        guard (200...299).contains(httpResponse.statusCode) else {
+            if httpResponse.statusCode == 401 { throw ApiError.unauthorized }
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let msg = json["error"] as? String, !msg.isEmpty {
+                throw ApiError.networkError(msg)
+            }
+            throw ApiError.requestFailed
+        }
+    }
+
     func sendMessageToCustomer(phone: String, message: String) async throws {
         let url = "\(baseURL)/api/bot/send-message"
         let body = try encoder.encode(["phone": phone, "message": message])
@@ -686,9 +721,15 @@ class ApiService {
     }
     
     func getMenu() async throws -> [MenuItem] {
-        let url = "\(baseURL)/api/admin/menu"
-        
-        guard let request = buildRequest(url: url, method: "GET") else {
+        let urlString = "\(baseURL)/api/admin/menu"
+        guard URL(string: urlString) != nil else {
+            print("❌ ApiService.getMenu: URL inválida: \(urlString)")
+            throw ApiError.invalidURL
+        }
+        guard let request = buildRequest(url: urlString, method: "GET") else {
+            if authService.getCredentials() == nil {
+                throw ApiError.unauthorized
+            }
             print("❌ ApiService.getMenu: Não foi possível criar requisição")
             throw ApiError.invalidURL
         }

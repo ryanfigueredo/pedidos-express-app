@@ -20,21 +20,27 @@ extension UIColor {
     static let pedidosTextPrimary = UIColor(red: 17/255, green: 24/255, blue: 39/255, alpha: 1.0) // #111827
     static let pedidosTextSecondary = UIColor(red: 107/255, green: 114/255, blue: 128/255, alpha: 1.0) // #6b7280
 
-    // Tema escuro – Schedule (Barbeiro, inspirado Squire)
+    // Tema escuro – Schedule (Barbeiro): fundo suave (não preto puro)
     static let scheduleBackground = UIColor(red: 18/255, green: 18/255, blue: 18/255, alpha: 1.0) // #121212
-    static let scheduleCard = UIColor(red: 30/255, green: 30/255, blue: 30/255, alpha: 1.0) // #1E1E1E
-    static let scheduleCurrentTimeLine = UIColor(red: 234/255, green: 88/255, blue: 12/255, alpha: 0.8) // accent
-    static let scheduleTextPrimary = UIColor.white
+    static let scheduleCard = UIColor(red: 26/255, green: 26/255, blue: 26/255, alpha: 1.0) // #1A1A1A
+    static let scheduleCurrentTimeLine = UIColor(red: 212/255, green: 175/255, blue: 55/255, alpha: 1.0) // #D4AF37
+    static let scheduleTextPrimary = UIColor(red: 1, green: 1, blue: 1, alpha: 1.0) // #FFFFFF
     static let scheduleTextSecondary = UIColor(red: 163/255, green: 163/255, blue: 163/255, alpha: 1.0) // #A3A3A3
-    static let scheduleDaySelected = UIColor(red: 234/255, green: 88/255, blue: 12/255, alpha: 1.0)
-    static let scheduleBadgeConfirmed = UIColor(red: 34/255, green: 197/255, blue: 94/255, alpha: 1.0)   // green
-    static let scheduleBadgePending = UIColor(red: 234/255, green: 179/255, blue: 8/255, alpha: 1.0)      // amber
+    /// Horários da timeline: mais claro que secondary para contraste no preto (#C4C4C4)
+    static let scheduleTimeLabel = UIColor(red: 196/255, green: 196/255, blue: 196/255, alpha: 1.0) // #C4C4C4
+    /// Linhas entre slots: visível mas sutil (#2E2E2E)
+    static let scheduleSeparator = UIColor(red: 46/255, green: 46/255, blue: 46/255, alpha: 1.0) // #2E2E2E
+    static let scheduleDaySelected = UIColor(red: 212/255, green: 175/255, blue: 55/255, alpha: 1.0) // #D4AF37
+    static let scheduleBadgeConfirmed = UIColor(red: 34/255, green: 197/255, blue: 94/255, alpha: 1.0)
+    static let scheduleBadgePending = UIColor(red: 234/255, green: 179/255, blue: 8/255, alpha: 1.0)
 
-    // Tema Barbeiro (Dark/Premium – Primary dourado)
-    static let barberPrimary = UIColor(red: 212/255, green: 175/255, blue: 55/255, alpha: 1.0)  // #D4AF37
-    static let barberBackground = UIColor(red: 18/255, green: 18/255, blue: 18/255, alpha: 1.0)   // #121212
-    static let barberCard = UIColor(red: 30/255, green: 30/255, blue: 30/255, alpha: 1.0)          // #1E1E1E
-    static let barberTextPrimary = UIColor.white
+    // Tema Barbeiro: fundo conteúdo #121212 (suave), chrome #121212, texto #FFFFFF, destaques #D4AF37
+    static let barberPrimary = UIColor(red: 212/255, green: 175/255, blue: 55/255, alpha: 1.0)  // #D4AF37 (dourado)
+    static let barberBackground = UIColor(red: 18/255, green: 18/255, blue: 18/255, alpha: 1.0)  // #121212 (cinza escuro suave)
+    /// Top Bar e Tab Bar: cinza grafite para separar do conteúdo (#121212)
+    static let barberChrome = UIColor(red: 18/255, green: 18/255, blue: 18/255, alpha: 1.0)     // #121212
+    static let barberCard = UIColor(red: 26/255, green: 26/255, blue: 26/255, alpha: 1.0)       // #1A1A1A
+    static let barberTextPrimary = UIColor(red: 1, green: 1, blue: 1, alpha: 1.0)                // #FFFFFF
     static let barberTextSecondary = UIColor(red: 163/255, green: 163/255, blue: 163/255, alpha: 1.0) // #A3A3A3
 }
 

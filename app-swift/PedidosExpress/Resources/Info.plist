@@ -4,6 +4,8 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>ApiBaseURL</key>
+	<string>https://pedidos.dmtn.com.br</string>
 	<key>CFBundleDisplayName</key>
 	<string>Pedidos Express</string>
 	<key>CFBundleExecutable</key>

@@ -115,10 +115,8 @@ class OrdersViewController: UIViewController {
         refreshControl.addTarget(self, action: #selector(refreshOrders), for: .valueChanged)
         ordersTableView.refreshControl = refreshControl
         
-        // Navigation Bar Button - Conectar Impressora (apenas para não-barbeiros)
-        let authServiceForBarButton = AuthService()
-        let userForBarButton = authServiceForBarButton.getUser()
-        if userForBarButton?.isBarbeiro != true {
+        // Impressora: nunca mostrar em modo barbeiro (evita conflitos de layout e não é usado).
+        if !BusinessProvider.isBarber {
             navigationItem.rightBarButtonItem = UIBarButtonItem(
                 title: "Impressora",
                 style: .plain,
@@ -160,8 +158,9 @@ class OrdersViewController: UIViewController {
         view.backgroundColor = BusinessProvider.backgroundColor
         ordersTableView?.backgroundColor = BusinessProvider.backgroundColor
         applyNavigationBarTheme()
-        let authService = AuthService()
-        if authService.getUser()?.isBarbeiro != true {
+        if BusinessProvider.isBarber {
+            navigationItem.rightBarButtonItem = nil
+        } else {
             updatePrinterButtonTitle()
         }
     }
@@ -170,10 +169,12 @@ class OrdersViewController: UIViewController {
         guard let navBar = navigationController?.navigationBar else { return }
         if BusinessProvider.isBarber {
             navBar.tintColor = .barberPrimary
-            navBar.barTintColor = .barberBackground
+            navBar.barTintColor = .barberChrome
+            navBar.isTranslucent = true
             let appearance = UINavigationBarAppearance()
-            appearance.configureWithOpaqueBackground()
-            appearance.backgroundColor = .barberBackground
+            appearance.configureWithTransparentBackground()
+            appearance.backgroundEffect = UIBlurEffect(style: .dark)
+            appearance.backgroundColor = UIColor.barberChrome.withAlphaComponent(0.72)
             appearance.titleTextAttributes = [.foregroundColor: UIColor.barberPrimary]
             navBar.standardAppearance = appearance
             navBar.scrollEdgeAppearance = appearance

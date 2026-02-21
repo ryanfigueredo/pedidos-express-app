@@ -650,6 +650,96 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Agendamento manual (app iOS: barbeiro adiciona cliente pessoalmente, sem slot_id)
+    const appointmentDateRaw = body?.appointment_date;
+    const isManualAppointment =
+      orderType === "appointment" &&
+      !slotId &&
+      appointmentDateRaw != null &&
+      String(appointmentDateRaw).trim() !== "";
+
+    if (isManualAppointment) {
+      const customerName = String(body?.customer_name ?? "").trim().substring(0, 200);
+      if (!customerName) {
+        return NextResponse.json(
+          { success: false, error: "Nome do cliente é obrigatório." },
+          { status: 400 }
+        );
+      }
+      let normalizedPhone = String(body?.customer_phone ?? "")
+        .replace(/\D/g, "")
+        .substring(0, 20);
+      if (normalizedPhone.startsWith("55") && normalizedPhone.length > 11) {
+        normalizedPhone = normalizedPhone.substring(2);
+      }
+      if (!normalizedPhone) normalizedPhone = "local";
+
+      const rawItems = body?.items;
+      const items = sanitizeOrderItems(rawItems);
+      const totalPrice =
+        typeof body?.total_price === "number"
+          ? body.total_price
+          : parseFloat(body?.total_price);
+      const totalNum = Number.isFinite(totalPrice) && totalPrice >= 0 ? totalPrice : 0;
+
+      let appointmentDate: Date;
+      try {
+        appointmentDate = new Date(appointmentDateRaw);
+      } catch {
+        return NextResponse.json(
+          { success: false, error: "Data/hora do agendamento inválida." },
+          { status: 400 }
+        );
+      }
+      if (Number.isNaN(appointmentDate.getTime())) {
+        return NextResponse.json(
+          { success: false, error: "Data/hora do agendamento inválida." },
+          { status: 400 }
+        );
+      }
+
+      const displayId =
+        String(appointmentDate.getHours()).padStart(2, "0") +
+        ":" +
+        String(appointmentDate.getMinutes()).padStart(2, "0");
+
+      const order = await prisma.order.create({
+        data: {
+          tenant_id: tenantId,
+          customer_name: customerName,
+          customer_phone: normalizedPhone,
+          items: (items.length ? items : [{ id: "servico", name: "Agendamento", quantity: 1, price: totalNum }]) as unknown as Prisma.InputJsonValue,
+          total_price: new Prisma.Decimal(Math.max(0, totalNum)),
+          status: "pending",
+          payment_method: body?.payment_method ?? null,
+          order_type: "appointment",
+          appointment_date: appointmentDate,
+          appointment_type: body?.appointment_type ?? "corte",
+          display_id: displayId,
+        },
+      });
+
+      const itemsFormatted = Array.isArray(order.items) ? (order.items as any[]) : [];
+      return NextResponse.json(
+        {
+          success: true,
+          order: {
+            id: order.id,
+            customer_name: order.customer_name,
+            customer_phone: order.customer_phone,
+            items: itemsFormatted,
+            total_price: totalNum,
+            status: order.status,
+            created_at: order.created_at.toISOString(),
+            display_id: order.display_id,
+            appointment_date: appointmentDate.toISOString(),
+            order_type: "appointment",
+          },
+        },
+        { status: 201 }
+      );
+    }
+
     const storeStatus = getStoreStatus();
     if (!storeStatus.isOpen) {
       const message =

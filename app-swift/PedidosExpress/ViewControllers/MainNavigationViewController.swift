@@ -1,17 +1,18 @@
 import UIKit
 
-class MainNavigationViewController: UITabBarController {
+class MainNavigationViewController: UITabBarController, UITabBarControllerDelegate {
 
-    /// Último valor de isBarber conhecido; usado em viewWillAppear para detectar mudança e recarregar abas.
     private var lastKnownIsBarber: Bool?
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        delegate = self
         lastKnownIsBarber = BusinessProvider.isBarber
         if viewControllers == nil || viewControllers?.isEmpty == true {
             setupTabBar()
         }
         applyThemeForCurrentBusinessType()
+        applyThemeToCurrentTab()
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -22,6 +23,30 @@ class MainNavigationViewController: UITabBarController {
             reloadTabBar()
         } else {
             lastKnownIsBarber = currentIsBarber
+        }
+        applyThemeToCurrentTab()
+    }
+
+    func tabBarController(_ tabBarController: UITabBarController, didSelect viewController: UIViewController) {
+        applyThemeToCurrentTab()
+    }
+
+    /// Garante que a nav bar da aba atual mantenha o tema (barbeiro = dourado/escuro).
+    private func applyThemeToCurrentTab() {
+        guard let nav = selectedViewController as? UINavigationController else { return }
+        if BusinessProvider.isBarber {
+            nav.navigationBar.tintColor = .barberPrimary
+            nav.navigationBar.barTintColor = .barberChrome
+            nav.navigationBar.isTranslucent = true
+            nav.navigationBar.overrideUserInterfaceStyle = .dark
+            let appearance = UINavigationBarAppearance()
+            appearance.configureWithTransparentBackground()
+            appearance.backgroundEffect = UIBlurEffect(style: .dark)
+            appearance.backgroundColor = UIColor.barberChrome.withAlphaComponent(0.72)
+            appearance.titleTextAttributes = [.foregroundColor: UIColor.barberPrimary]
+            nav.navigationBar.standardAppearance = appearance
+            nav.navigationBar.scrollEdgeAppearance = appearance
+            nav.navigationBar.compactAppearance = appearance
         }
     }
 
@@ -50,30 +75,42 @@ class MainNavigationViewController: UITabBarController {
         appearance.configureWithOpaqueBackground()
         appearance.backgroundColor = .systemBackground
         appearance.titleTextAttributes = [.foregroundColor: UIColor.pedidosOrange]
-        appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.pedidosOrange]
 
-        UINavigationBar.appearance().standardAppearance = appearance
-        UINavigationBar.appearance().scrollEdgeAppearance = appearance
-        UINavigationBar.appearance().tintColor = .pedidosOrange
-        UINavigationBar.appearance().prefersLargeTitles = false
+        for case let nav as UINavigationController in viewControllers ?? [] {
+            nav.navigationBar.standardAppearance = appearance
+            nav.navigationBar.scrollEdgeAppearance = appearance
+            nav.navigationBar.compactAppearance = appearance
+            nav.navigationBar.tintColor = .pedidosOrange
+            nav.navigationBar.barTintColor = .systemBackground
+            nav.navigationBar.isTranslucent = false
+            nav.navigationBar.prefersLargeTitles = false
+        }
     }
 
     private func applyBarberTheme() {
+        // Tab Bar: cinza grafite #121212 (separação do conteúdo preto)
         tabBar.tintColor = .barberPrimary
         tabBar.unselectedItemTintColor = .barberTextSecondary
-        tabBar.backgroundColor = .barberBackground
-        tabBar.barTintColor = .barberBackground
+        tabBar.backgroundColor = .barberChrome
+        tabBar.barTintColor = .barberChrome
 
+        // Nav Bar: blur (glassmorphism) + grafite #121212 – estilo Luxe/Apple
         let appearance = UINavigationBarAppearance()
-        appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = .barberBackground
+        appearance.configureWithTransparentBackground()
+        appearance.backgroundEffect = UIBlurEffect(style: .dark)
+        appearance.backgroundColor = UIColor.barberChrome.withAlphaComponent(0.72)
         appearance.titleTextAttributes = [.foregroundColor: UIColor.barberPrimary]
-        appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.barberPrimary]
 
-        UINavigationBar.appearance().standardAppearance = appearance
-        UINavigationBar.appearance().scrollEdgeAppearance = appearance
-        UINavigationBar.appearance().tintColor = .barberPrimary
-        UINavigationBar.appearance().prefersLargeTitles = false
+        for case let nav as UINavigationController in viewControllers ?? [] {
+            nav.navigationBar.standardAppearance = appearance
+            nav.navigationBar.scrollEdgeAppearance = appearance
+            nav.navigationBar.compactAppearance = appearance
+            nav.navigationBar.tintColor = .barberPrimary
+            nav.navigationBar.barTintColor = .barberChrome
+            nav.navigationBar.isTranslucent = true
+            nav.navigationBar.prefersLargeTitles = false
+            nav.navigationBar.overrideUserInterfaceStyle = .dark
+        }
     }
     
     /// Monta as abas (Agenda ou Pedidos, Dashboard, Serviços/Cardápio, Atendimento/Suporte, Config) conforme business_type.

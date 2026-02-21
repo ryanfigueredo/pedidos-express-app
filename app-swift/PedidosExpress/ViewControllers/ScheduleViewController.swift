@@ -1,13 +1,12 @@
 import UIKit
 
-/// View de agenda (timeline) para barbeiro. Exibe o dia com seletor de datas e timeline vertical.
-/// Inspirado no Squire: tema dark, linha do tempo com horários e cards de agendamento.
+/// View de agenda (timeline) para barbeiro. Estilo Squire: cabeçalho de data centralizado [<] Data [>], timeline full width.
 final class ScheduleViewController: UIViewController {
 
     private let apiService = ApiService()
     private var allOrders: [Order] = []
     private var selectedDate: Date = Date()
-    private var appointmentsForSelectedDay: [Order] = [] // ordenados por horário
+    private var appointmentsForSelectedDay: [Order] = []
     private let calendar = Calendar.current
     private let dateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -15,48 +14,162 @@ final class ScheduleViewController: UIViewController {
         f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
         return f
     }()
-    private let timeFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm"
-        return f
-    }()
-    private let dayLabelFormatter: DateFormatter = {
+    private let headerDateFormatter: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "pt_BR")
-        f.dateFormat = "EEE d" // "Seg 10"
+        f.dateFormat = "EEEE, d 'de' MMM" // "Quarta, 21 de Fev"
         return f
     }()
 
-    private var daySelectorScrollView: UIScrollView!
-    private var dayStackView: UIStackView!
+    private var dateHeaderContainer: UIView!
+    private var dateLabel: UILabel!
     private var timelineTableView: UITableView!
     private var refreshControl: UIRefreshControl!
     private var currentTimeLineView: UIView!
     private var currentTimeLineTopConstraint: NSLayoutConstraint?
     private var progressIndicator: UIActivityIndicatorView!
+    private var emptyStateView: UIView!
 
     private static let slotHeight: CGFloat = 72
+    private static let dateHeaderHeight: CGFloat = 56
     private static let startHour = 8
     private static let endHour = 20
-    private static let slotCount: Int = (endHour - startHour) * 2 // 30 min slots
+    private static let slotCount: Int = (endHour - startHour) * 2
 
     override func viewDidLoad() {
         super.viewDidLoad()
         title = BusinessProvider.isBarber ? "Agenda" : "Minha Agenda"
         view.backgroundColor = .scheduleBackground
         navigationItem.largeTitleDisplayMode = .never
-        // Barra escura para combinar com o tema
-        let navAppearance = UINavigationBarAppearance()
-        navAppearance.configureWithOpaqueBackground()
-        navAppearance.backgroundColor = .scheduleBackground
-        navAppearance.titleTextAttributes = [.foregroundColor: UIColor.scheduleTextPrimary]
-        navigationController?.navigationBar.standardAppearance = navAppearance
-        navigationController?.navigationBar.scrollEdgeAppearance = navAppearance
-        navigationController?.navigationBar.tintColor = .barberPrimary
-        setupDaySelector()
+        navigationItem.rightBarButtonItems = []
+        navigationItem.leftBarButtonItems = []
+
+        // Nav Bar: blur + grafite #121212 (glassmorphism, conteúdo passa por baixo)
+        let nav = navigationController?.navigationBar
+        nav?.barTintColor = .barberChrome
+        nav?.tintColor = .barberPrimary
+        nav?.isTranslucent = true
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithTransparentBackground()
+        appearance.backgroundEffect = UIBlurEffect(style: .dark)
+        appearance.backgroundColor = UIColor.barberChrome.withAlphaComponent(0.72)
+        appearance.titleTextAttributes = [.foregroundColor: UIColor.barberPrimary]
+        nav?.standardAppearance = appearance
+        nav?.scrollEdgeAppearance = appearance
+        nav?.compactAppearance = appearance
+
+        setupDateHeader()
         setupTimeline()
         setupCurrentTimeLine()
+        setupEmptyState()
+        updateDateLabel()
+        if BusinessProvider.isBarber {
+            navigationItem.rightBarButtonItem = UIBarButtonItem(
+                image: UIImage(systemName: "plus.circle.fill"),
+                style: .plain,
+                target: self,
+                action: #selector(addManualAppointment)
+            )
+            navigationItem.rightBarButtonItem?.tintColor = .barberPrimary
+        }
         loadOrders()
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        navigationItem.largeTitleDisplayMode = .never
+        if BusinessProvider.isBarber {
+            navigationItem.rightBarButtonItem = UIBarButtonItem(
+                image: UIImage(systemName: "plus.circle.fill"),
+                style: .plain,
+                target: self,
+                action: #selector(addManualAppointment)
+            )
+            navigationItem.rightBarButtonItem?.tintColor = .barberPrimary
+        }
+    }
+
+    @objc private func addManualAppointment() {
+        let alert = UIAlertController(
+            title: "Novo agendamento",
+            message: "Cliente que está agendando pessoalmente (fora do WhatsApp).",
+            preferredStyle: .alert
+        )
+        alert.addTextField { field in
+            field.placeholder = "Nome do cliente"
+            field.autocapitalizationType = .words
+        }
+        alert.addTextField { field in
+            field.placeholder = "Telefone (opcional)"
+            field.keyboardType = .phonePad
+        }
+        alert.addAction(UIAlertAction(title: "Cancelar", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Escolher horário", style: .default) { [weak self] _ in
+            guard let self = self else { return }
+            let name = alert.textFields?.first?.text?.trimmingCharacters(in: .whitespaces) ?? "Cliente"
+            let phone = alert.textFields?.last?.text?.trimmingCharacters(in: .whitespaces) ?? ""
+            self.showTimePickerForManualAppointment(customerName: name, customerPhone: phone)
+        })
+        present(alert, animated: true)
+    }
+
+    private func showTimePickerForManualAppointment(customerName: String, customerPhone: String) {
+        let slots = (0..<Self.slotCount).map { index in
+            (index, slotTimeString(at: index))
+        }
+        let alert = UIAlertController(title: "Horário", message: "Selecione o horário para o dia \(headerDateFormatter.string(from: selectedDate))", preferredStyle: .actionSheet)
+        for (index, timeStr) in slots {
+            alert.addAction(UIAlertAction(title: timeStr, style: .default) { [weak self] _ in
+                self?.createManualAppointment(customerName: customerName, customerPhone: customerPhone, slotIndex: index)
+            })
+        }
+        alert.addAction(UIAlertAction(title: "Cancelar", style: .cancel))
+        if let popover = alert.popoverPresentationController {
+            popover.barButtonItem = navigationItem.rightBarButtonItem
+            popover.sourceView = view
+        }
+        present(alert, animated: true)
+    }
+
+    private func createManualAppointment(customerName: String, customerPhone: String, slotIndex: Int) {
+        let hour = Self.startHour + (slotIndex / 2)
+        let minute = (slotIndex % 2) * 30
+        let startOfDay = calendar.startOfDay(for: selectedDate)
+        guard let appointmentDate = calendar.date(bySettingHour: hour, minute: minute, second: 0, of: startOfDay) else {
+            showMessage("Não foi possível definir o horário.")
+            return
+        }
+        let isoFormatter = ISO8601DateFormatter()
+        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let appointmentDateString = isoFormatter.string(from: appointmentDate)
+
+        Task {
+            do {
+                try await apiService.createAppointment(customerName: customerName, customerPhone: customerPhone, appointmentDate: appointmentDateString)
+                await MainActor.run {
+                    showMessage("Agendamento adicionado.")
+                    loadOrders()
+                }
+            } catch let err as ApiError {
+                await MainActor.run {
+                    showMessage(err.localizedDescription)
+                }
+            } catch {
+                await MainActor.run {
+                    showMessage("Não foi possível criar o agendamento. Tente novamente.")
+                }
+            }
+        }
+    }
+
+    private func showMessage(_ message: String) {
+        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
+    }
+
+    override var preferredStatusBarStyle: UIStatusBarStyle {
+        return .lightContent
     }
 
     override func viewDidLayoutSubviews() {
@@ -64,92 +177,124 @@ final class ScheduleViewController: UIViewController {
         updateCurrentTimeLinePosition()
     }
 
-    private func setupDaySelector() {
-        daySelectorScrollView = UIScrollView()
-        daySelectorScrollView.showsHorizontalScrollIndicator = false
-        daySelectorScrollView.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(daySelectorScrollView)
+    // MARK: - Cabeçalho de data (Squire: [<] Nome do dia e data [>])
+    private func setupDateHeader() {
+        dateHeaderContainer = UIView()
+        dateHeaderContainer.translatesAutoresizingMaskIntoConstraints = false
+        dateHeaderContainer.backgroundColor = .scheduleBackground
+        view.addSubview(dateHeaderContainer)
 
-        dayStackView = UIStackView()
-        dayStackView.axis = .horizontal
-        dayStackView.spacing = 12
-        dayStackView.translatesAutoresizingMaskIntoConstraints = false
-        daySelectorScrollView.addSubview(dayStackView)
+        let leftButton = UIButton(type: .system)
+        leftButton.setImage(UIImage(systemName: "chevron.left"), for: .normal)
+        leftButton.tintColor = .barberPrimary
+        leftButton.translatesAutoresizingMaskIntoConstraints = false
+        leftButton.addTarget(self, action: #selector(previousDay), for: .touchUpInside)
 
-        NSLayoutConstraint.activate([
-            dayStackView.topAnchor.constraint(equalTo: daySelectorScrollView.topAnchor),
-            dayStackView.leadingAnchor.constraint(equalTo: daySelectorScrollView.leadingAnchor, constant: 16),
-            dayStackView.trailingAnchor.constraint(equalTo: daySelectorScrollView.trailingAnchor, constant: -16),
-            dayStackView.bottomAnchor.constraint(equalTo: daySelectorScrollView.bottomAnchor),
-            dayStackView.heightAnchor.constraint(equalTo: daySelectorScrollView.heightAnchor),
-        ])
+        dateLabel = UILabel()
+        dateLabel.font = .boldSystemFont(ofSize: 18)
+        dateLabel.textColor = .scheduleTextPrimary
+        dateLabel.textAlignment = .center
+        dateLabel.translatesAutoresizingMaskIntoConstraints = false
 
-        // Gerar 14 dias: 7 passados + hoje + 6 futuros
-        let todayStart = calendar.startOfDay(for: Date())
-        for offset in -7..<7 {
-            guard let d = calendar.date(byAdding: .day, value: offset, to: Date()) else { continue }
-            let label = UILabel()
-            label.text = dayLabelFormatter.string(from: d)
-            label.font = .systemFont(ofSize: 14, weight: .medium)
-            label.textColor = calendar.isDate(d, inSameDayAs: todayStart) ? .barberBackground : .scheduleTextSecondary
-            label.textAlignment = .center
-            let container = UIView()
-            container.translatesAutoresizingMaskIntoConstraints = false
-            container.backgroundColor = calendar.isDate(d, inSameDayAs: todayStart) ? .barberPrimary : .clear
-            container.layer.cornerRadius = 20
-            container.addSubview(label)
-            label.translatesAutoresizingMaskIntoConstraints = false
-            NSLayoutConstraint.activate([
-                label.centerXAnchor.constraint(equalTo: container.centerXAnchor),
-                label.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-                label.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 16),
-                label.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -16),
-            ])
-            container.widthAnchor.constraint(equalToConstant: 56).isActive = true
-            container.heightAnchor.constraint(equalToConstant: 40).isActive = true
-            let tap = UITapGestureRecognizer(target: self, action: #selector(dayTapped(_:)))
-            container.addGestureRecognizer(tap)
-            container.isUserInteractionEnabled = true
-            container.tag = offset + 7
-            dayStackView.addArrangedSubview(container)
-        }
+        let rightButton = UIButton(type: .system)
+        rightButton.setImage(UIImage(systemName: "chevron.right"), for: .normal)
+        rightButton.tintColor = .barberPrimary
+        rightButton.translatesAutoresizingMaskIntoConstraints = false
+        rightButton.addTarget(self, action: #selector(nextDay), for: .touchUpInside)
+
+        let stack = UIStackView(arrangedSubviews: [leftButton, dateLabel, rightButton])
+        stack.axis = .horizontal
+        stack.alignment = .center
+        stack.distribution = .equalSpacing
+        stack.spacing = 16
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        dateHeaderContainer.addSubview(stack)
 
         NSLayoutConstraint.activate([
-            daySelectorScrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
-            daySelectorScrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            daySelectorScrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            daySelectorScrollView.heightAnchor.constraint(equalToConstant: 52),
+            dateHeaderContainer.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            dateHeaderContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            dateHeaderContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            dateHeaderContainer.heightAnchor.constraint(equalToConstant: Self.dateHeaderHeight),
+            stack.centerXAnchor.constraint(equalTo: dateHeaderContainer.centerXAnchor),
+            stack.centerYAnchor.constraint(equalTo: dateHeaderContainer.centerYAnchor),
+            stack.leadingAnchor.constraint(greaterThanOrEqualTo: dateHeaderContainer.leadingAnchor, constant: 16),
+            dateHeaderContainer.trailingAnchor.constraint(greaterThanOrEqualTo: stack.trailingAnchor, constant: 16),
+            leftButton.widthAnchor.constraint(equalToConstant: 44),
+            leftButton.heightAnchor.constraint(equalToConstant: 44),
+            rightButton.widthAnchor.constraint(equalToConstant: 44),
+            rightButton.heightAnchor.constraint(equalToConstant: 44),
         ])
     }
 
-    @objc private func dayTapped(_ gesture: UITapGestureRecognizer) {
-        guard let container = gesture.view else { return }
-        let offset = container.tag - 7
-        guard let d = calendar.date(byAdding: .day, value: offset, to: Date()) else { return }
+    private func updateDateLabel() {
+        if calendar.isDateInToday(selectedDate) {
+            let dayNameFormatter = DateFormatter()
+            dayNameFormatter.locale = Locale(identifier: "pt_BR")
+            dayNameFormatter.dateFormat = "EEEE"
+            let dayName = dayNameFormatter.string(from: selectedDate)
+            dateLabel.text = "Hoje, \(dayName)"
+        } else {
+            dateLabel.text = headerDateFormatter.string(from: selectedDate)
+        }
+    }
+
+    @objc private func previousDay() {
+        guard let d = calendar.date(byAdding: .day, value: -1, to: selectedDate) else { return }
         selectedDate = d
-        updateDaySelectorAppearance()
+        updateDateLabel()
         filterAppointmentsForSelectedDay()
+        updateEmptyState()
         timelineTableView.reloadData()
+        loadOrders()
     }
 
-    private func updateDaySelectorAppearance() {
-        let todayStart = calendar.startOfDay(for: Date())
-        let selectedStart = calendar.startOfDay(for: selectedDate)
-        for (index, subview) in dayStackView.arrangedSubviews.enumerated() {
-            guard let container = subview as? UIView, let label = container.subviews.first as? UILabel else { continue }
-            let offset = index - 7
-            guard let d = calendar.date(byAdding: .day, value: offset, to: Date()) else { continue }
-            let isSelected = calendar.isDate(d, inSameDayAs: selectedStart)
-            container.backgroundColor = isSelected ? .barberPrimary : .clear
-            label.textColor = isSelected ? .barberBackground : .scheduleTextSecondary
-        }
+    @objc private func nextDay() {
+        guard let d = calendar.date(byAdding: .day, value: 1, to: selectedDate) else { return }
+        selectedDate = d
+        updateDateLabel()
+        filterAppointmentsForSelectedDay()
+        updateEmptyState()
+        timelineTableView.reloadData()
+        loadOrders()
+    }
+
+    private func setupEmptyState() {
+        let container = UIView()
+        container.translatesAutoresizingMaskIntoConstraints = false
+        let icon = UIImageView(image: UIImage(systemName: "calendar"))
+        icon.tintColor = .barberTextSecondary
+        icon.contentMode = .scaleAspectFit
+        icon.translatesAutoresizingMaskIntoConstraints = false
+        let label = UILabel()
+        label.text = "Nenhum agendamento para este dia"
+        label.font = .systemFont(ofSize: 16, weight: .medium)
+        label.textColor = .barberTextSecondary
+        label.textAlignment = .center
+        label.numberOfLines = 0
+        label.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(icon)
+        container.addSubview(label)
+        NSLayoutConstraint.activate([
+            icon.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            icon.widthAnchor.constraint(equalToConstant: 48),
+            icon.heightAnchor.constraint(equalToConstant: 48),
+            label.topAnchor.constraint(equalTo: icon.bottomAnchor, constant: 12),
+            label.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 24),
+            label.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -24),
+            icon.centerYAnchor.constraint(equalTo: container.centerYAnchor, constant: -40),
+        ])
+        emptyStateView = container
+    }
+
+    private func updateEmptyState() {
+        timelineTableView.backgroundView = appointmentsForSelectedDay.isEmpty ? emptyStateView : nil
     }
 
     private func setupTimeline() {
         timelineTableView = UITableView(frame: .zero, style: .plain)
         timelineTableView.backgroundColor = .scheduleBackground
-        timelineTableView.separatorColor = UIColor.white.withAlphaComponent(0.08)
-        timelineTableView.separatorInset = UIEdgeInsets(top: 0, left: 56, bottom: 0, right: 0)
+        timelineTableView.separatorColor = .scheduleSeparator
+        timelineTableView.separatorInset = UIEdgeInsets(top: 0, left: 16, bottom: 0, right: 16)
         timelineTableView.delegate = self
         timelineTableView.dataSource = self
         timelineTableView.register(ScheduleTimeCell.self, forCellReuseIdentifier: ScheduleTimeCell.reuseId)
@@ -170,7 +315,7 @@ final class ScheduleViewController: UIViewController {
         view.addSubview(progressIndicator)
 
         NSLayoutConstraint.activate([
-            timelineTableView.topAnchor.constraint(equalTo: daySelectorScrollView.bottomAnchor, constant: 8),
+            timelineTableView.topAnchor.constraint(equalTo: dateHeaderContainer.bottomAnchor, constant: 8),
             timelineTableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             timelineTableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             timelineTableView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
@@ -188,7 +333,7 @@ final class ScheduleViewController: UIViewController {
         currentTimeLineTopConstraint = top
         NSLayoutConstraint.activate([
             top,
-            currentTimeLineView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 48),
+            currentTimeLineView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             currentTimeLineView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             currentTimeLineView.heightAnchor.constraint(equalToConstant: 2),
         ])
@@ -211,7 +356,7 @@ final class ScheduleViewController: UIViewController {
         }
         let slotIndex = totalMinutes / 30
         let fraction = CGFloat((totalMinutes % 30)) / 30.0
-        let y: CGFloat = 8 + 52 + 8 + CGFloat(slotIndex) * Self.slotHeight + fraction * Self.slotHeight + Self.slotHeight / 2 - 1
+        let y = Self.dateHeaderHeight + 8 + CGFloat(slotIndex) * Self.slotHeight + fraction * Self.slotHeight + Self.slotHeight / 2 - 1
         currentTimeLineTopConstraint?.constant = y
     }
 
@@ -224,6 +369,7 @@ final class ScheduleViewController: UIViewController {
                 await MainActor.run {
                     self.allOrders = response.orders
                     self.filterAppointmentsForSelectedDay()
+                    self.updateEmptyState()
                     self.timelineTableView.reloadData()
                     self.progressIndicator.stopAnimating()
                     self.refreshControl.endRefreshing()
@@ -338,8 +484,8 @@ private final class ScheduleTimeCell: UITableViewCell {
 
     private let timeLabel: UILabel = {
         let l = UILabel()
-        l.font = .monospacedSystemFont(ofSize: 12, weight: .medium)
-        l.textColor = .scheduleTextSecondary
+        l.font = .monospacedSystemFont(ofSize: 14, weight: .semibold)
+        l.textColor = .scheduleTimeLabel
         l.translatesAutoresizingMaskIntoConstraints = false
         return l
     }()
@@ -383,8 +529,8 @@ private final class ScheduleTimeCell: UITableViewCell {
         NSLayoutConstraint.activate([
             timeLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
             timeLabel.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            timeLabel.widthAnchor.constraint(equalToConstant: 40),
-            cardContainer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 56),
+            timeLabel.widthAnchor.constraint(equalToConstant: 52),
+            cardContainer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 72),
             cardContainer.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             cardContainer.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 6),
             cardContainer.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -6),

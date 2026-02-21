@@ -15,6 +15,15 @@ class SettingsViewController: UIViewController {
         "Sobre",
         "Sair"
     ]
+
+    /// Itens exibidos: em modo barbeiro não mostramos nada de impressora.
+    private var visibleSettingsItems: [String] {
+        let isBarber = BusinessProvider.isBarber || authService.getUser()?.businessType?.uppercased() == "BARBEIRO"
+        if isBarber {
+            return settingsItems.filter { $0 != "Impressora Bluetooth" }
+        }
+        return settingsItems
+    }
     
     private var user: User?
     private var tenantName: String = "Loja"
@@ -29,32 +38,29 @@ class SettingsViewController: UIViewController {
         tenantName = user?.tenantId ?? "Loja"
         setupUI()
         setupTableView()
-        observePrinterHelper()
+        if !BusinessProvider.isBarber {
+            observePrinterHelper()
+        }
     }
-    
+
     private func observePrinterHelper() {
-        // Observar mudanças nas impressoras disponíveis
+        guard !BusinessProvider.isBarber else { return }
         printerHelper.$availablePrinters
             .receive(on: DispatchQueue.main)
             .sink { [weak self] printers in
                 self?.logger.info("📱 SettingsViewController: \(printers.count) impressoras disponíveis")
             }
             .store(in: &cancellables)
-        
-        // Observar status de conexão
         printerHelper.$isConnected
             .receive(on: DispatchQueue.main)
             .sink { [weak self] isConnected in
                 self?.logger.info("🔌 SettingsViewController: Impressora conectada: \(isConnected)")
             }
             .store(in: &cancellables)
-        
-        // Observar status de scan
         printerHelper.$isScanning
             .receive(on: DispatchQueue.main)
             .sink { [weak self] isScanning in
                 if !isScanning {
-                    // Scan finalizado, mostrar resultados
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         self?.showPrinterScanResults()
                     }
@@ -62,7 +68,7 @@ class SettingsViewController: UIViewController {
             }
             .store(in: &cancellables)
     }
-    
+
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         user = authService.getUser()
@@ -246,7 +252,7 @@ extension SettingsViewController: UITableViewDataSource, UITableViewDelegate {
         if section == 0 {
             return 3
         }
-        return settingsItems.count
+        return visibleSettingsItems.count
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -263,7 +269,7 @@ extension SettingsViewController: UITableViewDataSource, UITableViewDelegate {
         if indexPath.section == 0 {
             configureInfoCell(cell, at: indexPath)
         } else {
-            cell.textLabel?.text = settingsItems[indexPath.row]
+            cell.textLabel?.text = visibleSettingsItems[indexPath.row]
             cell.accessoryType = .disclosureIndicator
         }
         
@@ -310,12 +316,14 @@ extension SettingsViewController: UITableViewDataSource, UITableViewDelegate {
     }
     
     private func handleSettingsAction(at index: Int) {
-        switch index {
-        case 0:
+        guard index < visibleSettingsItems.count else { return }
+        let item = visibleSettingsItems[index]
+        switch item {
+        case "Impressora Bluetooth":
             showPrinterSettings()
-        case 1:
+        case "Sobre":
             showAbout()
-        case 2:
+        case "Sair":
             logout()
         default:
             break

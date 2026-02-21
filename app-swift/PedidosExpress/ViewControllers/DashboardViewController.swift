@@ -30,30 +30,47 @@ class DashboardViewController: UIViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         view.backgroundColor = BusinessProvider.backgroundColor
+        if BusinessProvider.isBarber {
+            navigationItem.rightBarButtonItem = nil
+            navigationItem.rightBarButtonItems = nil
+            navigationItem.leftBarButtonItem = nil
+            navigationItem.leftBarButtonItems = nil
+        }
         applyNavigationBarTheme()
         loadStats()
+    }
+
+    override var preferredStatusBarStyle: UIStatusBarStyle {
+        return BusinessProvider.isBarber ? .lightContent : .default
     }
 
     private func applyNavigationBarTheme() {
         guard let navBar = navigationController?.navigationBar else { return }
         if BusinessProvider.isBarber {
             navBar.tintColor = .barberPrimary
-            navBar.barTintColor = .barberBackground
+            navBar.barTintColor = .barberChrome
+            navBar.isTranslucent = true
+            navBar.overrideUserInterfaceStyle = .dark
             let appearance = UINavigationBarAppearance()
-            appearance.configureWithOpaqueBackground()
-            appearance.backgroundColor = .barberBackground
+            appearance.configureWithTransparentBackground()
+            appearance.backgroundEffect = UIBlurEffect(style: .dark)
+            appearance.backgroundColor = UIColor.barberChrome.withAlphaComponent(0.72)
             appearance.titleTextAttributes = [.foregroundColor: UIColor.barberPrimary]
             navBar.standardAppearance = appearance
             navBar.scrollEdgeAppearance = appearance
+            navBar.compactAppearance = appearance
         } else {
+            navBar.overrideUserInterfaceStyle = .unspecified
             navBar.tintColor = .pedidosOrange
             navBar.barTintColor = .systemBackground
+            navBar.isTranslucent = false
             let appearance = UINavigationBarAppearance()
             appearance.configureWithOpaqueBackground()
             appearance.backgroundColor = .systemBackground
             appearance.titleTextAttributes = [.foregroundColor: UIColor.pedidosOrange]
             navBar.standardAppearance = appearance
             navBar.scrollEdgeAppearance = appearance
+            navBar.compactAppearance = appearance
         }
     }
     
@@ -195,6 +212,7 @@ class DashboardViewController: UIViewController {
         stack.axis = .horizontal
         stack.spacing = 8
         stack.distribution = .fillEqually
+        stack.translatesAutoresizingMaskIntoConstraints = false
         return stack
     }
     
@@ -236,23 +254,26 @@ class DashboardViewController: UIViewController {
         let contentStack = UIStackView(arrangedSubviews: [iconImageView, valueLabel, titleLabel])
         contentStack.axis = .vertical
         contentStack.spacing = 8
+        contentStack.alignment = .leading
         contentStack.translatesAutoresizingMaskIntoConstraints = false
-        
+
+        let iconH = iconImageView.heightAnchor.constraint(equalToConstant: 32)
+        let iconW = iconImageView.widthAnchor.constraint(equalToConstant: 32)
+        iconW.priority = UILayoutPriority(999)
+        NSLayoutConstraint.activate([iconH, iconW])
+
         container.addSubview(gradientView)
         gradientView.addSubview(contentStack)
-        
+
         NSLayoutConstraint.activate([
             gradientView.topAnchor.constraint(equalTo: container.topAnchor),
             gradientView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
             gradientView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
             gradientView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-            
-            iconImageView.heightAnchor.constraint(equalToConstant: 32),
-            iconImageView.widthAnchor.constraint(equalToConstant: 32),
-            
+
             contentStack.topAnchor.constraint(equalTo: gradientView.topAnchor, constant: 16),
             contentStack.leadingAnchor.constraint(equalTo: gradientView.leadingAnchor, constant: 16),
-            contentStack.trailingAnchor.constraint(equalTo: gradientView.trailingAnchor, constant: -16),
+            contentStack.trailingAnchor.constraint(lessThanOrEqualTo: gradientView.trailingAnchor, constant: -16),
             contentStack.bottomAnchor.constraint(equalTo: gradientView.bottomAnchor, constant: -16)
         ])
         
