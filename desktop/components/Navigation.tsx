@@ -25,6 +25,7 @@ interface UserData {
   name: string;
   role: string;
   tenant_id?: string | null;
+  business_type?: string | null;
 }
 
 interface TenantProfile {
@@ -116,6 +117,7 @@ export function Navigation() {
   // Se for super admin (sem tenant_id), mostrar apenas links administrativos
   const isSuperAdmin = user && !user.tenant_id;
   
+  const menuLabel = user?.business_type === "BARBEIRO" ? "Serviços" : "Cardápio";
   const navItems = isSuperAdmin
     ? [
         { href: "/admin", label: "Master", icon: Crown },
@@ -124,7 +126,7 @@ export function Navigation() {
     : [
         { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
         { href: "/dashboard/stream", label: "Pedidos", icon: ClipboardList },
-        { href: "/cardapio", label: "Cardápio", icon: UtensilsCrossed },
+        { href: "/cardapio", label: menuLabel, icon: UtensilsCrossed },
         { href: "/atendimento", label: "Atendimento", icon: MessageCircle },
       ];
 

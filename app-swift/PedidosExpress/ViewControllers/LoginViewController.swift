@@ -48,22 +48,27 @@ class LoginViewController: UIViewController {
     }
 
     private func setupUI() {
-        view.backgroundColor = UIColor(red: 249/255, green: 249/255, blue: 249/255, alpha: 1) // #F9F9F9 off-white
+        // Cores alinhadas ao desktop: primary-50 #fff7ed, botão primary-600 #ea580c
+        view.backgroundColor = UIColor.pedidosOrangeLight // #fff7ed (igual desktop login)
 
         scrollView = UIScrollView()
         scrollView.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.keyboardDismissMode = .interactive
+        scrollView.keyboardDismissMode = .onDrag
         scrollView.showsVerticalScrollIndicator = false
+        scrollView.delaysContentTouches = false
+        scrollView.backgroundColor = .clear
         view.addSubview(scrollView)
 
         contentView = UIView()
         contentView.translatesAutoresizingMaskIntoConstraints = false
+        contentView.backgroundColor = .clear
         scrollView.addSubview(contentView)
 
-        // Logo DMTN centralizada (preta para contraste em fundo claro)
+        let topPadding: CGFloat = 60
+
         logoImageView = UIImageView(image: UIImage(named: "DMTNLogo"))
         logoImageView.contentMode = .scaleAspectFit
-        logoImageView.tintColor = .black
+        logoImageView.tintColor = .pedidosOrange
         logoImageView.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(logoImageView)
 
@@ -80,52 +85,54 @@ class LoginViewController: UIViewController {
         passwordTextField.delegate = self
         passwordToggleButton = UIButton(type: .system)
         passwordToggleButton.setImage(UIImage(systemName: "eye.slash"), for: .normal)
-        passwordToggleButton.tintColor = .darkGray
+        passwordToggleButton.tintColor = .pedidosOrange
         passwordToggleButton.addTarget(self, action: #selector(togglePasswordVisibility), for: .touchUpInside)
         passwordToggleButton.frame = CGRect(x: 0, y: 0, width: 44, height: 44)
         passwordTextField.rightView = passwordToggleButton
         passwordTextField.rightViewMode = .always
         contentView.addSubview(passwordTextField)
 
-        forgotPasswordButton = UIButton(type: .system)
-        forgotPasswordButton.setTitle("Esqueci minha senha", for: .normal)
-        forgotPasswordButton.setTitleColor(.systemBlue, for: .normal)
-        forgotPasswordButton.titleLabel?.font = .systemFont(ofSize: 14, weight: .medium)
-        forgotPasswordButton.addTarget(self, action: #selector(forgotPasswordTapped), for: .touchUpInside)
-        forgotPasswordButton.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(forgotPasswordButton)
-
         savePasswordLabel = UILabel()
         savePasswordLabel.text = "Salvar senha"
-        savePasswordLabel.font = .systemFont(ofSize: 16)
-        savePasswordLabel.textColor = .black
+        savePasswordLabel.font = .systemFont(ofSize: 15, weight: .medium)
+        savePasswordLabel.textColor = .pedidosTextPrimary
         savePasswordLabel.translatesAutoresizingMaskIntoConstraints = false
 
         savePasswordSwitch = UISwitch()
-        savePasswordSwitch.onTintColor = .black
+        savePasswordSwitch.onTintColor = .pedidosOrange
         savePasswordSwitch.thumbTintColor = .white
         savePasswordSwitch.isOn = false
         savePasswordSwitch.translatesAutoresizingMaskIntoConstraints = false
 
-        let savePasswordStack = UIStackView(arrangedSubviews: [savePasswordLabel, savePasswordSwitch])
-        savePasswordStack.axis = .horizontal
-        savePasswordStack.spacing = 12
-        savePasswordStack.alignment = .center
-        savePasswordStack.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(savePasswordStack)
+        forgotPasswordButton = UIButton(type: .system)
+        forgotPasswordButton.setTitle("Esqueci minha senha", for: .normal)
+        forgotPasswordButton.setTitleColor(.pedidosOrange, for: .normal)
+        forgotPasswordButton.titleLabel?.font = .systemFont(ofSize: 14, weight: .medium)
+        forgotPasswordButton.addTarget(self, action: #selector(forgotPasswordTapped), for: .touchUpInside)
+        forgotPasswordButton.translatesAutoresizingMaskIntoConstraints = false
+
+        let spacer = UIView()
+        spacer.translatesAutoresizingMaskIntoConstraints = false
+        let salvarEsqueciRow = UIStackView(arrangedSubviews: [savePasswordLabel, savePasswordSwitch, spacer, forgotPasswordButton])
+        salvarEsqueciRow.axis = .horizontal
+        salvarEsqueciRow.spacing = 10
+        salvarEsqueciRow.alignment = .center
+        salvarEsqueciRow.distribution = .fill
+        salvarEsqueciRow.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(salvarEsqueciRow)
 
         loginButton = UIButton(type: .system)
         loginButton.setTitle("Entrar", for: .normal)
         loginButton.setTitleColor(.white, for: .normal)
         loginButton.titleLabel?.font = .systemFont(ofSize: 17, weight: .semibold)
-        loginButton.backgroundColor = .black
+        loginButton.backgroundColor = .pedidosOrange
         loginButton.layer.cornerRadius = 12
         loginButton.addTarget(self, action: #selector(loginButtonTapped), for: .touchUpInside)
         loginButton.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(loginButton)
 
         progressIndicator = UIActivityIndicatorView(style: .medium)
-        progressIndicator.color = .black
+        progressIndicator.color = .pedidosOrange
         progressIndicator.hidesWhenStopped = true
         progressIndicator.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(progressIndicator)
@@ -136,7 +143,7 @@ class LoginViewController: UIViewController {
         let buttonHeight: CGFloat = 52
 
         NSLayoutConstraint.activate([
-            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            scrollView.topAnchor.constraint(equalTo: view.topAnchor),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
@@ -148,13 +155,13 @@ class LoginViewController: UIViewController {
             contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
 
             logoImageView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            logoImageView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 48),
+            logoImageView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: topPadding),
             logoImageView.widthAnchor.constraint(equalToConstant: 200),
             logoImageView.heightAnchor.constraint(equalToConstant: 80),
 
             usernameTextField.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: margin),
             usernameTextField.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -margin),
-            usernameTextField.topAnchor.constraint(equalTo: logoImageView.bottomAnchor, constant: 48),
+            usernameTextField.topAnchor.constraint(equalTo: logoImageView.bottomAnchor, constant: 40),
             usernameTextField.heightAnchor.constraint(equalToConstant: fieldHeight),
 
             passwordTextField.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: margin),
@@ -162,15 +169,13 @@ class LoginViewController: UIViewController {
             passwordTextField.topAnchor.constraint(equalTo: usernameTextField.bottomAnchor, constant: 16),
             passwordTextField.heightAnchor.constraint(equalToConstant: fieldHeight),
 
-            forgotPasswordButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -margin),
-            forgotPasswordButton.topAnchor.constraint(equalTo: passwordTextField.bottomAnchor, constant: 10),
-
-            savePasswordStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: margin),
-            savePasswordStack.topAnchor.constraint(equalTo: forgotPasswordButton.bottomAnchor, constant: 24),
+            salvarEsqueciRow.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: margin),
+            salvarEsqueciRow.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -margin),
+            salvarEsqueciRow.topAnchor.constraint(equalTo: passwordTextField.bottomAnchor, constant: 16),
 
             loginButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: margin),
             loginButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -margin),
-            loginButton.topAnchor.constraint(equalTo: savePasswordStack.bottomAnchor, constant: 28),
+            loginButton.topAnchor.constraint(equalTo: salvarEsqueciRow.bottomAnchor, constant: 28),
             loginButton.heightAnchor.constraint(equalToConstant: 52),
 
             progressIndicator.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
@@ -184,12 +189,12 @@ class LoginViewController: UIViewController {
         tf.placeholder = placeholder
         tf.borderStyle = .none
         tf.backgroundColor = .white
-        tf.textColor = .black
+        tf.textColor = .pedidosTextPrimary
         tf.font = .systemFont(ofSize: 16)
         tf.translatesAutoresizingMaskIntoConstraints = false
         tf.layer.cornerRadius = 12
         tf.layer.borderWidth = 1
-        tf.layer.borderColor = UIColor(red: 0.9, green: 0.9, blue: 0.92, alpha: 1).cgColor
+        tf.layer.borderColor = UIColor(red: 229/255, green: 231/255, blue: 235/255, alpha: 1).cgColor
         tf.layer.shadowColor = UIColor.black.cgColor
         tf.layer.shadowOffset = CGSize(width: 0, height: 1)
         tf.layer.shadowRadius = 2
@@ -199,8 +204,10 @@ class LoginViewController: UIViewController {
         tf.leftViewMode = .always
         tf.attributedPlaceholder = NSAttributedString(
             string: placeholder,
-            attributes: [.foregroundColor: UIColor.darkGray.withAlphaComponent(0.7)]
+            attributes: [.foregroundColor: UIColor.pedidosTextSecondary]
         )
+        tf.autocapitalizationType = .none
+        tf.autocorrectionType = .no
         return tf
     }
 

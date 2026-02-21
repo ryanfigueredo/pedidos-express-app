@@ -30,6 +30,8 @@ export default function CardapioPage() {
     "padrao" | "maisVendidos" | "nome" | "precoMenor" | "precoMaior"
   >("padrao");
   const [deletingItem, setDeletingItem] = useState<string | null>(null);
+  const [user, setUser] = useState<{ business_type?: string } | null>(null);
+  const isBarber = user?.business_type === "BARBEIRO";
   const [formData, setFormData] = useState({
     name: "",
     price: "",
@@ -42,17 +44,29 @@ export default function CardapioPage() {
     available: true,
   });
 
-  // Verificar se é super admin e redirecionar
   useEffect(() => {
     fetch("/api/auth/me")
       .then((res) => res.json())
       .then((data) => {
-        if (data.success && data.user && !data.user.tenant_id) {
-          router.push("/admin");
+        if (data.success && data.user) {
+          setUser(data.user);
+          if (!data.user.tenant_id) router.push("/admin");
         }
       })
       .catch(() => {});
   }, [router]);
+
+  useEffect(() => {
+    if (!user) return;
+    const isBarberUser = user.business_type === "BARBEIRO";
+    setFormData((prev) => {
+      const validForBarber = ["Serviços", "Combos"].includes(prev.category);
+      const validForRestaurant = ["hamburguer", "bebida", "acompanhamento", "sobremesa"].includes(prev.category);
+      if (isBarberUser && !validForBarber) return { ...prev, category: "Serviços" };
+      if (!isBarberUser && !validForRestaurant) return { ...prev, category: "hamburguer" };
+      return prev;
+    });
+  }, [user]);
 
   useEffect(() => {
     loadMenu();
@@ -157,12 +171,12 @@ export default function CardapioPage() {
       }
       const data = await res.json();
       if (data.success) {
-        alert("Item adicionado com sucesso!");
+        alert(isBarber ? "Serviço adicionado com sucesso!" : "Item adicionado com sucesso!");
         setShowAddForm(false);
         setFormData({
           name: "",
           price: "",
-          category: "hamburguer",
+          category: isBarber ? "Serviços" : "hamburguer",
           available: true,
         });
         loadMenu();
@@ -273,13 +287,26 @@ export default function CardapioPage() {
   const statsMap = Object.fromEntries(stats.map((s) => [s.name, s]));
   const getItemCount = (name: string) => statsMap[name]?.quantity ?? 0;
 
-  const categories = ["hamburguer", "bebida", "acompanhamento", "sobremesa"];
-  const categoryLabels: Record<string, string> = {
-    hamburguer: "Hambúrgueres",
-    bebida: "Bebidas",
-    acompanhamento: "Acompanhamentos",
-    sobremesa: "Sobremesas",
+  const categories = isBarber
+    ? ["Serviços", "Combos"]
+    : ["hamburguer", "bebida", "acompanhamento", "sobremesa"];
+  const categoryLabels: Record<string, string> = isBarber
+    ? { Serviços: "Serviços", Combos: "Combos" }
+    : {
+        hamburguer: "Hambúrgueres",
+        bebida: "Bebidas",
+        acompanhamento: "Acompanhamentos",
+        sobremesa: "Sobremesas",
+      };
+
+  const barberCategoryMapping: Record<string, string[]> = {
+    Serviços: ["serviços", "servicos", "cabelo", "barba", "sobrancelha", "corte", "degradê", "degrade", "barbas", "bigode"],
+    Combos: ["combo", "combos", "pacote", "pacotes", "cabelo e barba", "cabelo barba sobrancelha"],
   };
+  const restaurantCategories = new Set([
+    "bebidas", "bebida", "comidas", "comida", "sobremesas", "sobremesa",
+    "acompanhamento", "acompanhamentos", "hamburguer", "hamburgueres", "doce", "doces",
+  ]);
 
   const sortItems = (items: MenuItem[]) => {
     const sorted = [...items];
@@ -300,7 +327,19 @@ export default function CardapioPage() {
   };
 
   const groupedItems = categories.reduce((acc, category) => {
-    const items = menuItems.filter((item) => item.category === category);
+    let items: MenuItem[];
+    if (isBarber) {
+      const comboKeywords = barberCategoryMapping["Combos"] ?? [];
+      items = menuItems.filter((item) => {
+        const c = (item.category || "").trim().toLowerCase();
+        if (!c || restaurantCategories.has(c)) return false;
+        const isCombo = comboKeywords.some((k) => c === k || c.includes(k));
+        if (category === "Combos") return isCombo;
+        return !isCombo; // Serviços: todo item não-combo (e não restaurante)
+      });
+    } else {
+      items = menuItems.filter((item) => item.category === category);
+    }
     acc[category] = sortItems(items);
     return acc;
   }, {} as Record<string, MenuItem[]>);
@@ -312,11 +351,12 @@ export default function CardapioPage() {
         <div className="flex justify-between items-center mb-8 animate-slide-in">
           <div>
             <h1 className="text-4xl font-bold text-gray-900 font-display mb-2">
-              Cardápio
+              {isBarber ? "Serviços" : "Cardápio"}
             </h1>
             <p className="text-gray-600 text-lg">
-              Mesmo cardápio exibido no bot (por categoria: Lanches, Bebidas,
-              etc.)
+              {isBarber
+                ? "Serviços exibidos no bot do WhatsApp (Serviços e Combos)"
+                : "Mesmo cardápio exibido no bot (por categoria: Lanches, Bebidas, etc.)"}
             </p>
           </div>
           <div className="flex gap-3 flex-wrap items-center">
@@ -344,7 +384,7 @@ export default function CardapioPage() {
               onClick={() => setShowAddForm(!showAddForm)}
               className="btn-primary"
             >
-              {showAddForm ? "Cancelar" : "+ Novo Item"}
+              {showAddForm ? "Cancelar" : isBarber ? "+ Novo Serviço" : "+ Novo Item"}
             </button>
           </div>
         </div>
@@ -353,13 +393,13 @@ export default function CardapioPage() {
         {showAddForm && (
           <div className="card-modern p-6 mb-8 border-2 border-primary-200 animate-fade-in">
             <h2 className="text-xl font-bold text-gray-900 mb-4 font-display">
-              Adicionar Novo Item
+              {isBarber ? "Adicionar Novo Serviço" : "Adicionar Novo Item"}
             </h2>
             <form onSubmit={handleAdd} className="space-y-4">
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Nome do Item *
+                    {isBarber ? "Nome do serviço *" : "Nome do Item *"}
                   </label>
                   <input
                     type="text"
@@ -369,7 +409,7 @@ export default function CardapioPage() {
                       setFormData({ ...formData, name: e.target.value })
                     }
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    placeholder="Ex: Hamb. Especial"
+                    placeholder={isBarber ? "Ex: Cabelo, Barba, Sobrancelha" : "Ex: Hamb. Especial"}
                   />
                 </div>
 
@@ -442,7 +482,7 @@ export default function CardapioPage() {
                     setFormData({
                       name: "",
                       price: "",
-                      category: "hamburguer",
+                      category: isBarber ? "Serviços" : "hamburguer",
                       available: true,
                     });
                   }}
@@ -463,9 +503,11 @@ export default function CardapioPage() {
           </div>
         ) : menuItems.length === 0 ? (
           <div className="bg-white rounded-lg shadow p-12 text-center">
-            <p className="text-gray-500 text-lg">Nenhum item no cardápio</p>
+            <p className="text-gray-500 text-lg">
+              {isBarber ? "Nenhum serviço cadastrado" : "Nenhum item no cardápio"}
+            </p>
             <p className="text-gray-400 text-sm mt-2">
-              Clique em "+ Novo Item" para adicionar
+              {isBarber ? "Clique em \"+ Novo Serviço\" para adicionar" : "Clique em \"+ Novo Item\" para adicionar"}
             </p>
           </div>
         ) : (
