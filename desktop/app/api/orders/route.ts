@@ -6,6 +6,22 @@ import { Prisma } from "@prisma/client";
 // Forçar rota dinâmica (não pode ser renderizada estaticamente)
 export const dynamic = "force-dynamic";
 
+/** Lê sessão do cookie da requisição (fallback quando next/headers não reflete o request). */
+function getSessionFromCookieHeader(cookieHeader: string | null): { id: string; tenant_id?: string | null } | null {
+  if (!cookieHeader) return null;
+  try {
+    const match = cookieHeader.match(/\bsession=([^;]+)/);
+    let value = match?.[1]?.trim();
+    if (!value) return null;
+    if (value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1).replace(/\\"/g, '"');
+    const decoded = decodeURIComponent(value);
+    const parsed = JSON.parse(decoded) as { id?: string; tenant_id?: string | null };
+    return parsed?.id ? { id: parsed.id, tenant_id: parsed.tenant_id } : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Obtém tenant_id a partir da sessão (web), headers (Basic Auth, X-Tenant-Id, X-API-Key). Usado por GET e POST. */
 async function getTenantIdFromRequest(
   request: NextRequest
@@ -13,24 +29,29 @@ async function getTenantIdFromRequest(
   let tenantId: string | null = null;
 
   // 1) Sessão (cookie) – dashboard web logado vê só pedidos do seu tenant
-  try {
-    const { getSession } = await import("@/lib/auth-session");
-    const session = await getSession();
-    if (session?.id) {
-      if (session.tenant_id) {
-        return session.tenant_id;
-      }
-      // Cookie antigo pode não ter tenant_id: buscar no banco
-      const user = await prisma.user.findUnique({
-        where: { id: session.id },
-        select: { tenant_id: true },
-      });
-      if (user?.tenant_id) {
-        return user.tenant_id;
-      }
-      // Super admin sem tenant: não usar fallback aqui, deixar para baixo (retorna null e depois default)
+  // Ler do header Cookie diretamente para garantir que usamos o request que chegou (evita bug em edge/worker)
+  const cookieHeader = request.headers.get("cookie");
+  let session: { id: string; tenant_id?: string | null } | null = getSessionFromCookieHeader(cookieHeader);
+  if (!session) {
+    try {
+      const { getSession } = await import("@/lib/auth-session");
+      session = await getSession();
+    } catch (_) {}
+  }
+  if (session?.id) {
+    if (session.tenant_id) {
+      return session.tenant_id;
     }
-  } catch (_) {}
+    // Cookie antigo pode não ter tenant_id: buscar no banco
+    const user = await prisma.user.findUnique({
+      where: { id: session.id },
+      select: { tenant_id: true },
+    });
+    if (user?.tenant_id) {
+      return user.tenant_id;
+    }
+    // Super admin sem tenant: não usar fallback aqui
+  }
 
   const authHeader =
     request.headers.get("authorization") ||
