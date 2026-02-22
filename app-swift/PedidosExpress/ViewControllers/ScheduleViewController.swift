@@ -384,37 +384,46 @@ final class ScheduleViewController: UIViewController {
         }
     }
 
-    // MARK: - Data (ISO8601 + fallback; Z = UTC, depois calendar em SP dá hora local)
+    // MARK: - Data (UTC no servidor; calendar em SP para dia/hora local = cards na timeline)
     private func dateForOrder(_ order: Order) -> Date? {
         guard let raw = order.appointmentDate else { return nil }
         let apt = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !apt.isEmpty else { return nil }
 
-        // 1. ISO8601 com milissegundos (.000Z) – formato que o servidor manda
+        let utc = TimeZone(secondsFromGMT: 0)!
+
+        // 1. Primeiros 19 chars como UTC (ex: 2026-02-22T00:08:55 ou 2026-02-22T12:00:00) – sempre funciona
+        if apt.count >= 19 {
+            let df = DateFormatter()
+            df.locale = Locale(identifier: "en_US_POSIX")
+            df.timeZone = utc
+            df.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+            let prefix = String(apt.prefix(19))
+            if let date = df.date(from: prefix) { return date }
+        }
+
+        // 2. ISO8601 com milissegundos (.027Z etc.)
         let isoWithMillis = ISO8601DateFormatter()
         isoWithMillis.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        isoWithMillis.timeZone = TimeZone(secondsFromGMT: 0)
+        isoWithMillis.timeZone = utc
         if let date = isoWithMillis.date(from: apt) { return date }
 
-        // 2. ISO8601 sem milissegundos
+        // 3. ISO8601 sem milissegundos
         let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+        isoFormatter.timeZone = utc
         if let date = isoFormatter.date(from: apt) { return date }
 
-        // 3. DateFormatter com formato explícito (UTC quando tem Z)
+        // 4. DateFormatter com Z literal
         let df = DateFormatter()
         df.locale = Locale(identifier: "en_US_POSIX")
-        df.timeZone = apt.uppercased().hasSuffix("Z") ? TimeZone(secondsFromGMT: 0) : TimeZone(identifier: "America/Sao_Paulo")
-        for format in ["yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", "yyyy-MM-dd'T'HH:mm:ss'Z'", "yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd HH:mm:ss"] {
+        df.timeZone = utc
+        for format in ["yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", "yyyy-MM-dd'T'HH:mm:ss'Z'", "yyyy-MM-dd HH:mm:ss"] {
             df.dateFormat = format
             if let date = df.date(from: apt) { return date }
         }
-        // 4. Fallback: strip T/Z e pegar primeiros 19 chars
-        let cleaned = apt.replacingOccurrences(of: "T", with: " ")
-            .replacingOccurrences(of: "Z", with: "")
-            .prefix(19)
+        // 5. Strip T/Z, 19 chars
+        let cleaned = apt.replacingOccurrences(of: "T", with: " ").replacingOccurrences(of: "Z", with: "").prefix(19)
         df.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        df.timeZone = apt.uppercased().hasSuffix("Z") ? TimeZone(secondsFromGMT: 0) : TimeZone(identifier: "America/Sao_Paulo")
         return df.date(from: String(cleaned))
     }
 
@@ -446,12 +455,14 @@ final class ScheduleViewController: UIViewController {
 
     private func updateTimelineBlocks() {
         dayColumnView.subviews.filter { $0 is ScheduleAppointmentBlockView }.forEach { $0.removeFromSuperview() }
+        let maxY = (CGFloat(endHour - startHour) * Self.pointsPerHour) - 4
         for order in appointmentsForSelectedDay {
             guard let startMinutes = timeForOrder(order), let aptDate = dateForOrder(order) else { continue }
-            let y = (CGFloat(startMinutes) / 60.0 - CGFloat(startHour)) * Self.pointsPerHour
+            var y = (CGFloat(startMinutes) / 60.0 - CGFloat(startHour)) * Self.pointsPerHour
+            y = max(2, y)
             let duration = CGFloat(order.estimatedTime ?? Self.defaultDurationMinutes)
             let height = (duration / 60.0) * Self.pointsPerHour
-            let blockHeight = max(height - 4, 44)
+            let blockHeight = min(maxY - 2, max(height - 4, 44))
             let timeString = blockHeight >= 56 ? Self.blockTimeFormatter.string(from: aptDate) : nil
 
             let block = ScheduleAppointmentBlockView(frame: .zero)
@@ -462,11 +473,13 @@ final class ScheduleViewController: UIViewController {
             NSLayoutConstraint.activate([
                 block.leadingAnchor.constraint(equalTo: dayColumnView.leadingAnchor, constant: 8),
                 block.trailingAnchor.constraint(equalTo: dayColumnView.trailingAnchor, constant: -8),
-                block.topAnchor.constraint(equalTo: dayColumnView.topAnchor, constant: y + 2),
-                block.heightAnchor.constraint(equalToConstant: min(blockHeight, (CGFloat(endHour - startHour) * Self.pointsPerHour) - 4))
+                block.topAnchor.constraint(equalTo: dayColumnView.topAnchor, constant: y),
+                block.heightAnchor.constraint(equalToConstant: blockHeight)
             ])
             block.onTap = { [weak self] in self?.showAppointmentActions(for: order) }
         }
+        dayColumnView.setNeedsLayout()
+        dayColumnView.layoutIfNeeded()
     }
 
     // MARK: - API e estado
