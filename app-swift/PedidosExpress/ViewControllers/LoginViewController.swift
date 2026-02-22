@@ -48,8 +48,7 @@ class LoginViewController: UIViewController {
     }
 
     private func setupUI() {
-        // Cores alinhadas ao desktop: primary-50 #fff7ed, botão primary-600 #ea580c
-        view.backgroundColor = UIColor.pedidosOrangeLight // #fff7ed (igual desktop login)
+        view.backgroundColor = .appBackgroundOffWhite
 
         scrollView = UIScrollView()
         scrollView.translatesAutoresizingMaskIntoConstraints = false
@@ -68,7 +67,7 @@ class LoginViewController: UIViewController {
 
         logoImageView = UIImageView(image: UIImage(named: "DMTNLogo"))
         logoImageView.contentMode = .scaleAspectFit
-        logoImageView.tintColor = .pedidosOrange
+        logoImageView.tintColor = .appPrimaryBlack
         logoImageView.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(logoImageView)
 
@@ -85,7 +84,7 @@ class LoginViewController: UIViewController {
         passwordTextField.delegate = self
         passwordToggleButton = UIButton(type: .system)
         passwordToggleButton.setImage(UIImage(systemName: "eye.slash"), for: .normal)
-        passwordToggleButton.tintColor = .pedidosOrange
+        passwordToggleButton.tintColor = .appPrimaryBlack
         passwordToggleButton.addTarget(self, action: #selector(togglePasswordVisibility), for: .touchUpInside)
         passwordToggleButton.frame = CGRect(x: 0, y: 0, width: 44, height: 44)
         passwordTextField.rightView = passwordToggleButton
@@ -95,18 +94,18 @@ class LoginViewController: UIViewController {
         savePasswordLabel = UILabel()
         savePasswordLabel.text = "Salvar senha"
         savePasswordLabel.font = .systemFont(ofSize: 15, weight: .medium)
-        savePasswordLabel.textColor = .pedidosTextPrimary
+        savePasswordLabel.textColor = .appTitleBlack
         savePasswordLabel.translatesAutoresizingMaskIntoConstraints = false
 
         savePasswordSwitch = UISwitch()
-        savePasswordSwitch.onTintColor = .pedidosOrange
+        savePasswordSwitch.onTintColor = .appPrimaryBlack
         savePasswordSwitch.thumbTintColor = .white
         savePasswordSwitch.isOn = false
         savePasswordSwitch.translatesAutoresizingMaskIntoConstraints = false
 
         forgotPasswordButton = UIButton(type: .system)
         forgotPasswordButton.setTitle("Esqueci minha senha", for: .normal)
-        forgotPasswordButton.setTitleColor(.pedidosOrange, for: .normal)
+        forgotPasswordButton.setTitleColor(.appPrimaryBlack, for: .normal)
         forgotPasswordButton.titleLabel?.font = .systemFont(ofSize: 14, weight: .medium)
         forgotPasswordButton.addTarget(self, action: #selector(forgotPasswordTapped), for: .touchUpInside)
         forgotPasswordButton.translatesAutoresizingMaskIntoConstraints = false
@@ -125,14 +124,14 @@ class LoginViewController: UIViewController {
         loginButton.setTitle("Entrar", for: .normal)
         loginButton.setTitleColor(.white, for: .normal)
         loginButton.titleLabel?.font = .systemFont(ofSize: 17, weight: .semibold)
-        loginButton.backgroundColor = .pedidosOrange
+        loginButton.backgroundColor = .appPrimaryBlack
         loginButton.layer.cornerRadius = 12
         loginButton.addTarget(self, action: #selector(loginButtonTapped), for: .touchUpInside)
         loginButton.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(loginButton)
 
         progressIndicator = UIActivityIndicatorView(style: .medium)
-        progressIndicator.color = .pedidosOrange
+        progressIndicator.color = .appPrimaryBlack
         progressIndicator.hidesWhenStopped = true
         progressIndicator.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(progressIndicator)
@@ -188,23 +187,23 @@ class LoginViewController: UIViewController {
         let tf = UITextField()
         tf.placeholder = placeholder
         tf.borderStyle = .none
-        tf.backgroundColor = .white
-        tf.textColor = .pedidosTextPrimary
+        tf.backgroundColor = .appCardWhite
+        tf.textColor = .appTitleBlack
         tf.font = .systemFont(ofSize: 16)
         tf.translatesAutoresizingMaskIntoConstraints = false
         tf.layer.cornerRadius = 12
         tf.layer.borderWidth = 1
         tf.layer.borderColor = UIColor(red: 229/255, green: 231/255, blue: 235/255, alpha: 1).cgColor
-        tf.layer.shadowColor = UIColor.black.cgColor
-        tf.layer.shadowOffset = CGSize(width: 0, height: 1)
-        tf.layer.shadowRadius = 2
-        tf.layer.shadowOpacity = 0.06
+        tf.layer.shadowColor = UIColor.appShadowColor.cgColor
+        tf.layer.shadowOffset = CGSize(width: 0, height: 2)
+        tf.layer.shadowRadius = 5
+        tf.layer.shadowOpacity = 0.05
         tf.clipsToBounds = false
         tf.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 16, height: 20))
         tf.leftViewMode = .always
         tf.attributedPlaceholder = NSAttributedString(
             string: placeholder,
-            attributes: [.foregroundColor: UIColor.pedidosTextSecondary]
+            attributes: [.foregroundColor: UIColor.appSubtitleGray]
         )
         tf.autocapitalizationType = .none
         tf.autocorrectionType = .no

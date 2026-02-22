@@ -21,9 +21,6 @@ class DashboardViewController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        if BusinessProvider.isBarber {
-            overrideUserInterfaceStyle = .dark
-        }
         title = "Dashboard"
         navigationItem.largeTitleDisplayMode = .never
         setupUI()
@@ -43,37 +40,20 @@ class DashboardViewController: UIViewController {
         loadStats()
     }
 
-    override var preferredStatusBarStyle: UIStatusBarStyle {
-        return BusinessProvider.isBarber ? .lightContent : .default
-    }
+    override var preferredStatusBarStyle: UIStatusBarStyle { .default }
 
     private func applyNavigationBarTheme() {
         guard let navBar = navigationController?.navigationBar else { return }
-        if BusinessProvider.isBarber {
-            navBar.tintColor = .barberPrimary
-            navBar.barTintColor = .barberNavBackground
-            navBar.isTranslucent = false
-            navBar.overrideUserInterfaceStyle = .dark
-            let appearance = UINavigationBarAppearance()
-            appearance.configureWithOpaqueBackground()
-            appearance.backgroundColor = .barberNavBackground
-            appearance.titleTextAttributes = [.foregroundColor: UIColor.barberPrimary]
-            navBar.standardAppearance = appearance
-            navBar.scrollEdgeAppearance = appearance
-            navBar.compactAppearance = appearance
-        } else {
-            navBar.overrideUserInterfaceStyle = .unspecified
-            navBar.tintColor = .pedidosOrange
-            navBar.barTintColor = .systemBackground
-            navBar.isTranslucent = false
-            let appearance = UINavigationBarAppearance()
-            appearance.configureWithOpaqueBackground()
-            appearance.backgroundColor = .systemBackground
-            appearance.titleTextAttributes = [.foregroundColor: UIColor.pedidosOrange]
-            navBar.standardAppearance = appearance
-            navBar.scrollEdgeAppearance = appearance
-            navBar.compactAppearance = appearance
-        }
+        navBar.tintColor = .appPrimaryBlack
+        navBar.barTintColor = .appCardWhite
+        navBar.isTranslucent = false
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = .appCardWhite
+        appearance.titleTextAttributes = [.foregroundColor: UIColor.appTitleBlack]
+        navBar.standardAppearance = appearance
+        navBar.scrollEdgeAppearance = appearance
+        navBar.compactAppearance = appearance
     }
     
     private func setupUI() {
@@ -103,8 +83,8 @@ class DashboardViewController: UIViewController {
             icon: "cart.fill",
             value: "0",
             title: BusinessTypeHelper.ordersTodayLabel(for: user),
-            gradientStart: isBarber ? .barberPrimary : .gradientOrangeStart,
-            gradientEnd: isBarber ? .barberPrimary : .gradientOrangeEnd
+            gradientStart: .appPrimaryBlack,
+            gradientEnd: .appPrimaryBlack
         )
         todayOrdersLabel = card1.valueLabel
 
@@ -130,8 +110,8 @@ class DashboardViewController: UIViewController {
                 icon: "calendar.badge.clock",
                 value: "0",
                 title: "Horários Ocupados",
-                gradientStart: .barberPrimary,
-                gradientEnd: .barberPrimary
+                gradientStart: .appPrimaryBlack,
+                gradientEnd: .appPrimaryBlack
             )
             occupiedSlotsLabel = card3.valueLabel
 
@@ -139,11 +119,11 @@ class DashboardViewController: UIViewController {
                 icon: "person.fill",
                 value: "—",
                 title: "Próximo Cliente",
-                gradientStart: .barberCard,
-                gradientEnd: .barberCard
+                gradientStart: .appCardWhite,
+                gradientEnd: .appCardWhite
             )
             nextClientLabel = card4.valueLabel
-            card4.container.backgroundColor = .barberCard
+            card4.container.backgroundColor = .appCardWhite
 
             row2.addArrangedSubview(card3.container)
             row2.addArrangedSubview(card4.container)
@@ -180,7 +160,7 @@ class DashboardViewController: UIViewController {
         progressIndicator = UIActivityIndicatorView(style: .large)
         progressIndicator.translatesAutoresizingMaskIntoConstraints = false
         progressIndicator.hidesWhenStopped = true
-        progressIndicator.color = BusinessProvider.isBarber ? .barberPrimary : .pedidosOrange
+        progressIndicator.color = .appPrimaryBlack
         view.addSubview(progressIndicator)
         
         NSLayoutConstraint.activate([

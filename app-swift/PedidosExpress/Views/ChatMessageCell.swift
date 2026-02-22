@@ -85,7 +85,7 @@ class ChatMessageCell: UITableViewCell {
         
         if message.isAttendant {
             // Mensagem do atendente (laranja, à direita)
-            messageBubbleView.backgroundColor = .pedidosOrange
+            messageBubbleView.backgroundColor = .appPrimaryBlack
             messageLabel.textColor = .white
             timeLabel.textColor = .white.withAlphaComponent(0.8)
             

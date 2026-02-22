@@ -8,8 +8,8 @@ import { getOrdersLabel } from "@/lib/business-type-helper";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
-const START_HOUR = 8;
-const END_HOUR = 21;
+const START_HOUR = 6;
+const END_HOUR = 24;
 const POINTS_PER_HOUR = 60;
 const DEFAULT_DURATION_MIN = 30;
 

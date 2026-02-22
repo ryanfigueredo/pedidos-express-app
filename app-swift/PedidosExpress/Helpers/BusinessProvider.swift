@@ -20,35 +20,12 @@ enum BusinessProvider {
         return bt == "RESTAURANTE" || bt == nil
     }
 
-    // MARK: - Tema visual
+    // MARK: - Tema visual (unificado para todos os tenants – apenas logo difere)
 
-    /// Cor primária (accent): barbeiro = dourado, restaurante = laranja
-    static var primaryColor: UIColor {
-        isBarber ? .barberPrimary : .pedidosOrange
-    }
-
-    /// Fundo da tela: barbeiro = dark, restaurante = claro
-    static var backgroundColor: UIColor {
-        isBarber ? .barberBackground : .pedidosOrangeLight
-    }
-
-    /// Fundo de cards: barbeiro = #1E1E1E, restaurante = systemBackground
-    static var cardBackgroundColor: UIColor {
-        isBarber ? .barberCard : .systemBackground
-    }
-
-    /// Corner radius dos cards: barbeiro = estilo Squire (mais quadrado), restaurante = 16
-    static var cardCornerRadius: CGFloat {
-        isBarber ? 8 : 16
-    }
-
-    /// Cor do texto principal
-    static var textPrimaryColor: UIColor {
-        isBarber ? .barberTextPrimary : .pedidosTextPrimary
-    }
-
-    /// Cor do texto secundário
-    static var textSecondaryColor: UIColor {
-        isBarber ? .barberTextSecondary : .pedidosTextSecondary
-    }
+    static var primaryColor: UIColor { .appPrimaryBlack }
+    static var backgroundColor: UIColor { .appBackgroundOffWhite }
+    static var cardBackgroundColor: UIColor { .appCardWhite }
+    static var cardCornerRadius: CGFloat { 12 }
+    static var textPrimaryColor: UIColor { .appTitleBlack }
+    static var textSecondaryColor: UIColor { .appSubtitleGray }
 }

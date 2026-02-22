@@ -200,8 +200,11 @@ class ApiService {
         }
     }
     
-    func getAllOrders(page: Int = 1, limit: Int = 20) async throws -> OrdersResponse {
-        let url = "\(baseURL)/api/orders?page=\(page)&limit=\(limit)"
+    func getAllOrders(page: Int = 1, limit: Int = 20, agendaDays: Int? = 2) async throws -> OrdersResponse {
+        var url = "\(baseURL)/api/orders?page=\(page)&limit=\(limit)"
+        if let days = agendaDays, days > 0 {
+            url += "&agenda_days=\(days)"
+        }
         
         guard let request = buildRequest(url: url, method: "GET") else {
             print("❌ ApiService.getAllOrders: Não foi possível criar requisição")
@@ -241,6 +244,19 @@ class ApiService {
             }
         }
         
+        #if DEBUG
+        if let jsonRaw = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let ordersData = jsonRaw["orders"] as? [[String: Any]],
+           let first = ordersData.first {
+            print("📦 ApiService.getAllOrders: Primeiro pedido (JSON bruto) – keys: \(first.keys.sorted().joined(separator: ", "))")
+            if let apt = first["appointment_date"] {
+                print("   📅 appointment_date: \(apt)")
+            } else {
+                print("   📅 appointment_date: ausente ou null")
+            }
+        }
+        #endif
+        
         // Tentar decodificar diretamente primeiro
         if let response = try? decoder.decode(OrdersResponse.self, from: data) {
             return response
@@ -265,34 +281,11 @@ class ApiService {
             
             for orderData in ordersData {
                 do {
-                    // Log dos valores importantes antes de decodificar
-                    #if DEBUG
-                    if let createdAtValue = orderData["created_at"] {
-                        let valueType = type(of: createdAtValue)
-                        let isNSNull = createdAtValue is NSNull
-                        print("   🔍 created_at tipo: \(valueType), é NSNull: \(isNSNull), valor: \(createdAtValue)")
-                    } else {
-                        print("   ⚠️ created_at é nil ou não existe no dicionário")
-                    }
-                    
-                    if let totalPriceValue = orderData["total_price"] {
-                        let valueType = type(of: totalPriceValue)
-                        let isNSNull = totalPriceValue is NSNull
-                        print("   💰 total_price tipo: \(valueType), é NSNull: \(isNSNull), valor: \(totalPriceValue)")
-                    } else {
-                        print("   ⚠️ total_price é nil ou não existe no dicionário")
-                    }
-                    #endif
-                    
                     // Garantir que created_at sempre tenha um valor válido
                     var sanitizedOrderData = orderData
                     if sanitizedOrderData["created_at"] == nil || sanitizedOrderData["created_at"] is NSNull {
-                        // Se created_at não existe ou é null, usar data atual
                         let formatter = ISO8601DateFormatter()
                         sanitizedOrderData["created_at"] = formatter.string(from: Date())
-                        #if DEBUG
-                        print("   🔧 created_at era null/nil, substituído por data atual")
-                        #endif
                     }
                     
                     // Converter NSNull para valores apropriados
@@ -310,19 +303,6 @@ class ApiService {
                         withJSONObject: sanitizedOrderData,
                         options: []
                     )
-                    
-                    #if DEBUG
-                    if let jsonString = String(data: orderJson, encoding: .utf8) {
-                        let preview = String(jsonString.prefix(500))
-                        print("   📄 JSON gerado (primeiros 500 chars): \(preview)")
-                        // Verificar se created_at está no JSON
-                        if jsonString.contains("\"created_at\"") {
-                            print("   ✅ created_at encontrado no JSON")
-                        } else {
-                            print("   ❌ created_at NÃO encontrado no JSON!")
-                        }
-                    }
-                    #endif
                     
                     let order = try decoder.decode(Order.self, from: orderJson)
                     orders.append(order)

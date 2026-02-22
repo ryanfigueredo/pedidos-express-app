@@ -32,9 +32,6 @@ class SettingsViewController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        if BusinessProvider.isBarber {
-            overrideUserInterfaceStyle = .dark
-        }
         title = "Configurações"
         navigationItem.largeTitleDisplayMode = .never
         user = authService.getUser()
@@ -50,15 +47,11 @@ class SettingsViewController: UIViewController {
         guard !BusinessProvider.isBarber else { return }
         printerHelper.$availablePrinters
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] printers in
-                self?.logger.info("📱 SettingsViewController: \(printers.count) impressoras disponíveis")
-            }
+            .sink { _ in }
             .store(in: &cancellables)
         printerHelper.$isConnected
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] isConnected in
-                self?.logger.info("🔌 SettingsViewController: Impressora conectada: \(isConnected)")
-            }
+            .sink { _ in }
             .store(in: &cancellables)
         printerHelper.$isScanning
             .receive(on: DispatchQueue.main)

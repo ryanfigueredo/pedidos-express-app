@@ -22,8 +22,8 @@ final class ManualAppointmentSheetViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        overrideUserInterfaceStyle = .dark
-        view.backgroundColor = .scheduleBackground
+        view.backgroundColor = .appBackgroundOffWhite
+        overrideUserInterfaceStyle = .light
         title = "Agendamento manual"
         navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: .cancel, target: self, action: #selector(cancelTapped))
         setupForm()
@@ -61,10 +61,13 @@ final class ManualAppointmentSheetViewController: UIViewController {
         servicePickerField.delegate = self
         let serviceToolbar = UIToolbar()
         serviceToolbar.sizeToFit()
+        serviceToolbar.barTintColor = .appCardWhite
+        serviceToolbar.isTranslucent = false
         serviceToolbar.items = [
             UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
             UIBarButtonItem(title: "OK", style: .done, target: self, action: #selector(servicePickerDone)),
         ]
+        serviceToolbar.tintColor = .appPrimaryBlack
         servicePickerField.inputAccessoryView = serviceToolbar
         stackView.addArrangedSubview(labelFor("Serviço"))
         stackView.addArrangedSubview(servicePickerField)
@@ -75,7 +78,7 @@ final class ManualAppointmentSheetViewController: UIViewController {
         datePicker.minimumDate = Date()
         datePicker.locale = Locale(identifier: "pt_BR")
         datePicker.translatesAutoresizingMaskIntoConstraints = false
-        datePicker.tintColor = .barberPrimary
+        datePicker.tintColor = .appPrimaryBlack
         stackView.addArrangedSubview(labelFor("Data e horário"))
         stackView.addArrangedSubview(datePicker)
 
@@ -83,14 +86,14 @@ final class ManualAppointmentSheetViewController: UIViewController {
         saveButton.setTitle("Salvar agendamento", for: .normal)
         saveButton.setTitleColor(.white, for: .normal)
         saveButton.titleLabel?.font = .systemFont(ofSize: 17, weight: .semibold)
-        saveButton.backgroundColor = .barberPrimary
+        saveButton.backgroundColor = .appPrimaryBlack
         saveButton.layer.cornerRadius = 12
         saveButton.addTarget(self, action: #selector(saveTapped), for: .touchUpInside)
         saveButton.translatesAutoresizingMaskIntoConstraints = false
         stackView.addArrangedSubview(saveButton)
 
         loadingIndicator = UIActivityIndicatorView(style: .medium)
-        loadingIndicator.color = .barberPrimary
+        loadingIndicator.color = .appPrimaryBlack
         loadingIndicator.hidesWhenStopped = true
         loadingIndicator.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(loadingIndicator)
@@ -118,19 +121,26 @@ final class ManualAppointmentSheetViewController: UIViewController {
         let l = UILabel()
         l.text = text
         l.font = .systemFont(ofSize: 14, weight: .medium)
-        l.textColor = .barberTextSecondary
+        l.textColor = .appSubtitleGray
         return l
     }
 
     private func makeField(placeholder: String) -> UITextField {
         let tf = UITextField()
-        tf.placeholder = placeholder
-        tf.borderStyle = .roundedRect
-        tf.backgroundColor = .scheduleCard
-        tf.textColor = .barberTextPrimary
+        tf.borderStyle = .none
+        tf.backgroundColor = .appCardWhite
+        tf.textColor = .appTitleBlack
         tf.font = .systemFont(ofSize: 16)
         tf.translatesAutoresizingMaskIntoConstraints = false
         tf.layer.cornerRadius = 10
+        tf.layer.borderWidth = 1
+        tf.layer.borderColor = UIColor.appGridLineLight.cgColor
+        tf.attributedPlaceholder = NSAttributedString(
+            string: placeholder,
+            attributes: [.foregroundColor: UIColor.appSubtitleGray]
+        )
+        tf.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 12, height: 20))
+        tf.leftViewMode = .always
         return tf
     }
 

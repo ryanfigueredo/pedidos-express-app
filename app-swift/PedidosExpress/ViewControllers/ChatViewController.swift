@@ -160,7 +160,7 @@ class ChatViewController: UIViewController {
         print("💬 ChatViewController: setupUI iniciado")
         #endif
         
-        view.backgroundColor = .pedidosOrangeLight
+        view.backgroundColor = .appBackgroundOffWhite
         
         title = conversation.phoneFormatted
         
@@ -171,7 +171,7 @@ class ChatViewController: UIViewController {
         // Botão para abrir WhatsApp externo
         whatsappButton = UIButton(type: .system)
         whatsappButton.setImage(UIImage(systemName: "message.fill"), for: .normal)
-        whatsappButton.tintColor = .pedidosOrange
+        whatsappButton.tintColor = .appPrimaryBlack
         whatsappButton.addTarget(self, action: #selector(openWhatsApp), for: .touchUpInside)
         navigationItem.rightBarButtonItem = UIBarButtonItem(customView: whatsappButton)
         
@@ -181,7 +181,7 @@ class ChatViewController: UIViewController {
         tableView.delegate = self
         tableView.dataSource = self
         tableView.separatorStyle = .none
-        tableView.backgroundColor = .pedidosOrangeLight
+        tableView.backgroundColor = .appBackgroundOffWhite
         tableView.register(ChatMessageCell.self, forCellReuseIdentifier: "ChatMessageCell")
         view.addSubview(tableView)
         
@@ -217,7 +217,7 @@ class ChatViewController: UIViewController {
         // TESTE: Usar UITextField com configuração mínima para garantir que funcione
         messageTextField = UITextField()
         messageTextField.translatesAutoresizingMaskIntoConstraints = false
-        messageTextField.backgroundColor = .pedidosOrangeLight
+        messageTextField.backgroundColor = .appBackgroundOffWhite
         messageTextField.layer.cornerRadius = 20
         messageTextField.font = .systemFont(ofSize: 16)
         messageTextField.placeholder = "Digite sua mensagem..."
@@ -266,7 +266,7 @@ class ChatViewController: UIViewController {
         sendButton = UIButton(type: .system)
         sendButton.translatesAutoresizingMaskIntoConstraints = false
         sendButton.setImage(UIImage(systemName: "arrow.up.circle.fill"), for: .normal)
-        sendButton.tintColor = .pedidosOrange
+        sendButton.tintColor = .appPrimaryBlack
         sendButton.addTarget(self, action: #selector(sendMessage), for: .touchUpInside)
         sendButton.isEnabled = false
         

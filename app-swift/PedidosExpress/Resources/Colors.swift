@@ -1,7 +1,23 @@
 import UIKit
 
+// MARK: - Paleta unificada (pedidos.dmtn.com.br – Minimalista Premium)
 extension UIColor {
-    // Cores principais do tema laranja
+    /// Fundo geral: off-white
+    static let appBackgroundOffWhite = UIColor(red: 248/255, green: 249/255, blue: 250/255, alpha: 1.0) // #F8F9FA
+    /// Botão primário: preto
+    static let appPrimaryBlack = UIColor(red: 0, green: 0, blue: 0, alpha: 1.0) // #000000
+    /// Cards / superfícies secundárias: branco puro
+    static let appCardWhite = UIColor(red: 1, green: 1, blue: 1, alpha: 1.0) // #FFFFFF
+    /// Títulos: preto puro
+    static let appTitleBlack = UIColor(red: 0, green: 0, blue: 0, alpha: 1.0) // #000000
+    /// Subtítulos: cinza escuro
+    static let appSubtitleGray = UIColor(red: 74/255, green: 74/255, blue: 74/255, alpha: 1.0) // #4A4A4A
+    /// Grade de horários (Agenda): cinza claríssimo
+    static let appGridLineLight = UIColor(red: 233/255, green: 236/255, blue: 239/255, alpha: 1.0) // #E9ECEF
+    /// Sombra padrão para cards: opacity 0.05, radius 5, offset (0,2)
+    static let appShadowColor = UIColor.black
+
+    // Cores principais do tema laranja (legado – uso apenas logo/tenant se necessário)
     static let pedidosOrange = UIColor(red: 234/255, green: 88/255, blue: 12/255, alpha: 1.0) // #ea580c
     static let pedidosOrangeDark = UIColor(red: 194/255, green: 65/255, blue: 12/255, alpha: 1.0) // #c2410c
     static let pedidosOrangeLight = UIColor(red: 255/255, green: 247/255, blue: 237/255, alpha: 1.0) // #fff7ed

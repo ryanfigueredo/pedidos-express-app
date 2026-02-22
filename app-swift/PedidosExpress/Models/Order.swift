@@ -18,6 +18,7 @@ struct Order: Codable {
     let deliveryFee: Double?
     let changeFor: Double?
     let printRequestedAt: String?
+    let estimatedTime: Int? // duração em minutos (para altura do bloco na agenda)
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -37,6 +38,7 @@ struct Order: Codable {
         case deliveryFee = "delivery_fee"
         case changeFor = "change_for"
         case printRequestedAt = "print_requested_at"
+        case estimatedTime = "estimated_time"
     }
     
     // Decoder customizado para lidar com campos faltantes ou tipos diferentes
@@ -66,49 +68,22 @@ struct Order: Codable {
         
         if let totalPriceDouble = try? container.decode(Double.self, forKey: .totalPrice) {
             decodedTotalPrice = totalPriceDouble
-            #if DEBUG
-            print("   💰 totalPrice decodificado como Double: \(totalPriceDouble)")
-            #endif
         } else if let totalPriceInt = try? container.decode(Int.self, forKey: .totalPrice) {
             decodedTotalPrice = Double(totalPriceInt)
-            #if DEBUG
-            print("   💰 totalPrice decodificado como Int: \(totalPriceInt) -> \(decodedTotalPrice)")
-            #endif
         } else if let totalPriceString = try? container.decode(String.self, forKey: .totalPrice) {
-            // Tentar converter string para double
             if let totalPriceDouble = Double(totalPriceString) {
                 decodedTotalPrice = totalPriceDouble
-                #if DEBUG
-                print("   💰 totalPrice decodificado como String: '\(totalPriceString)' -> \(totalPriceDouble)")
-                #endif
             } else {
-                // Se falhar, tentar remover caracteres não numéricos
                 let cleaned = totalPriceString.replacingOccurrences(of: "[^0-9.,]", with: "", options: .regularExpression)
                     .replacingOccurrences(of: ",", with: ".")
                 if let totalPriceDouble = Double(cleaned) {
                     decodedTotalPrice = totalPriceDouble
-                    #if DEBUG
-                    print("   💰 totalPrice limpo e convertido: '\(totalPriceString)' -> '\(cleaned)' -> \(totalPriceDouble)")
-                    #endif
-                } else {
-                    #if DEBUG
-                    print("   ⚠️ totalPrice não pôde ser convertido de '\(totalPriceString)'")
-                    #endif
                 }
             }
-        } else {
-            #if DEBUG
-            print("   ⚠️ totalPrice não encontrado ou null")
-            #endif
         }
-        
-        // Se o total decodificado for 0 ou inválido, calcular a partir dos itens
+
         if decodedTotalPrice <= 0 && !items.isEmpty {
-            let calculatedTotal = items.reduce(0.0) { $0 + (Double($1.quantity) * $1.price) }
-            totalPrice = calculatedTotal
-            #if DEBUG
-            print("   💰 totalPrice calculado a partir dos itens: \(calculatedTotal)")
-            #endif
+            totalPrice = items.reduce(0.0) { $0 + (Double($1.quantity) * $1.price) }
         } else {
             totalPrice = decodedTotalPrice
         }
@@ -138,6 +113,7 @@ struct Order: Codable {
         deliveryAddress = try? container.decode(String.self, forKey: .deliveryAddress)
         paymentMethod = try? container.decode(String.self, forKey: .paymentMethod)
         printRequestedAt = try? container.decode(String.self, forKey: .printRequestedAt)
+        estimatedTime = try? container.decode(Int.self, forKey: .estimatedTime)
         
         // Campos numéricos opcionais
         if let subtotalValue = try? container.decode(Double.self, forKey: .subtotal) {
@@ -187,6 +163,7 @@ struct Order: Codable {
         try container.encodeIfPresent(deliveryFee, forKey: .deliveryFee)
         try container.encodeIfPresent(changeFor, forKey: .changeFor)
         try container.encodeIfPresent(printRequestedAt, forKey: .printRequestedAt)
+        try container.encodeIfPresent(estimatedTime, forKey: .estimatedTime)
     }
 }
 

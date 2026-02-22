@@ -88,10 +88,10 @@ final class LogoView: UIView {
             titleLabel.textColor = .white
             subtitleLabel.textColor = .white.withAlphaComponent(0.8)
         } else {
-            containerView.backgroundColor = UIColor.pedidosOrange.withAlphaComponent(0.12)
-            logoImageView.tintColor = .pedidosOrange
-            titleLabel.textColor = .pedidosTextPrimary
-            subtitleLabel.textColor = .pedidosTextSecondary
+            containerView.backgroundColor = UIColor.appPrimaryBlack.withAlphaComponent(0.06)
+            logoImageView.tintColor = .appPrimaryBlack
+            titleLabel.textColor = .appTitleBlack
+            subtitleLabel.textColor = .appSubtitleGray
         }
     }
 }

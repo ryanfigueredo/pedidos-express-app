@@ -29,9 +29,6 @@ class OrdersViewController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        if BusinessProvider.isBarber {
-            overrideUserInterfaceStyle = .dark
-        }
         let authService = AuthService()
         let user = authService.getUser()
         title = user?.isBarbeiro == true ? "Esteira de agendamentos" : BusinessTypeHelper.ordersLabel(for: user)
@@ -174,28 +171,16 @@ class OrdersViewController: UIViewController {
 
     private func applyNavigationBarTheme() {
         guard let navBar = navigationController?.navigationBar else { return }
-        if BusinessProvider.isBarber {
-            navBar.tintColor = .barberPrimary
-            navBar.barTintColor = .barberNavBackground
-            navBar.isTranslucent = false
-            navBar.overrideUserInterfaceStyle = .dark
-            let appearance = UINavigationBarAppearance()
-            appearance.configureWithOpaqueBackground()
-            appearance.backgroundColor = .barberNavBackground
-            appearance.titleTextAttributes = [.foregroundColor: UIColor.barberPrimary]
-            navBar.standardAppearance = appearance
-            navBar.scrollEdgeAppearance = appearance
-            navBar.compactAppearance = appearance
-        } else {
-            navBar.tintColor = .pedidosOrange
-            navBar.barTintColor = .systemBackground
-            let appearance = UINavigationBarAppearance()
-            appearance.configureWithOpaqueBackground()
-            appearance.backgroundColor = .systemBackground
-            appearance.titleTextAttributes = [.foregroundColor: UIColor.pedidosOrange]
-            navBar.standardAppearance = appearance
-            navBar.scrollEdgeAppearance = appearance
-        }
+        navBar.tintColor = .appPrimaryBlack
+        navBar.barTintColor = .appCardWhite
+        navBar.isTranslucent = false
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = .appCardWhite
+        appearance.titleTextAttributes = [.foregroundColor: UIColor.appTitleBlack]
+        navBar.standardAppearance = appearance
+        navBar.scrollEdgeAppearance = appearance
+        navBar.compactAppearance = appearance
     }
     
     override func viewWillDisappear(_ animated: Bool) {
@@ -518,7 +503,7 @@ class OrdersViewController: UIViewController {
                             }
                         }
                     } else {
-                        self.logger.warning("⚠️ OrdersViewController: Impressora não conectada, pulando auto-impressão")
+                        // Impressora não usada neste app (apenas admin@tamboril.com); sem log.
                     }
                     
                     Task {
@@ -669,39 +654,22 @@ class OrdersViewController: UIViewController {
     }
     
     private func printOrder(_ order: Order) {
-        let logMsg = "🖨️ OrdersViewController: Tentando imprimir pedido #\(order.displayId ?? order.id)"
-        logger.info("\(logMsg)")
-        print("\(logMsg)")
-        
-        // Log detalhado do estado da impressora
-        let peripheralState = printerHelper.connectedPeripheral?.state.rawValue ?? -1
-        let stateMsg = "📊 OrdersViewController: Estado da impressora - isConnected: \(printerHelper.isConnected), peripheral: \(printerHelper.connectedPeripheral?.name ?? "nil"), state: \(peripheralState)"
-        logger.info("\(stateMsg)")
-        print("\(stateMsg)")
-        
         // Verificar se temos periférico conectado (mais confiável que apenas isConnected)
         let hasConnectedPeripheral = printerHelper.connectedPeripheral != nil && 
                                     printerHelper.connectedPeripheral?.state == .connected
         
         // Se temos periférico conectado mas isConnected está false, atualizar estado ANTES da verificação
         if hasConnectedPeripheral && !printerHelper.isConnected {
-            logger.warning("⚠️ OrdersViewController: Periférico conectado mas isConnected está false. Atualizando estado...")
-            print("⚠️ OrdersViewController: Periférico conectado mas isConnected está false. Atualizando estado...")
             printerHelper.isConnected = true
         }
         
         guard printerHelper.isConnected || hasConnectedPeripheral else {
-            let errorMsg = "❌ OrdersViewController: Impressora não conectada (isConnected = \(printerHelper.isConnected), hasPeripheral = \(hasConnectedPeripheral))"
-            logger.error("\(errorMsg)")
-            print("\(errorMsg)")
             showAlert(
                 title: "Impressora Não Conectada",
                 message: "Conecte uma impressora Bluetooth nas Configurações antes de imprimir."
             )
             return
         }
-        
-        logger.info("✅ OrdersViewController: Impressora conectada, enviando pedido para impressão...")
         progressIndicator.startAnimating()
         
         printerHelper.printOrder(order) { [weak self] success, errorMessage in

@@ -31,23 +31,19 @@ class MainNavigationViewController: UITabBarController, UITabBarControllerDelega
         applyThemeToCurrentTab()
     }
 
-    /// Garante que a nav bar da aba atual mantenha o tema (barbeiro = preto opaco + dourado).
     private func applyThemeToCurrentTab() {
         guard let nav = selectedViewController as? UINavigationController else { return }
-        if BusinessProvider.isBarber {
-            nav.navigationBar.tintColor = .barberPrimary
-            nav.navigationBar.barTintColor = .barberNavBackground
-            nav.navigationBar.isTranslucent = false
-            nav.navigationBar.overrideUserInterfaceStyle = .dark
-            let appearance = UINavigationBarAppearance()
-            appearance.configureWithOpaqueBackground()
-            appearance.backgroundColor = .barberNavBackground
-            appearance.titleTextAttributes = [.foregroundColor: UIColor.barberPrimary]
-            appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.barberPrimary]
-            nav.navigationBar.standardAppearance = appearance
-            nav.navigationBar.scrollEdgeAppearance = appearance
-            nav.navigationBar.compactAppearance = appearance
-        }
+        nav.navigationBar.tintColor = .appPrimaryBlack
+        nav.navigationBar.barTintColor = .appCardWhite
+        nav.navigationBar.isTranslucent = false
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = .appCardWhite
+        appearance.titleTextAttributes = [.foregroundColor: UIColor.appTitleBlack]
+        appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.appTitleBlack]
+        nav.navigationBar.standardAppearance = appearance
+        nav.navigationBar.scrollEdgeAppearance = appearance
+        nav.navigationBar.compactAppearance = appearance
     }
 
     /// Remove todas as abas e reconstrói com cores e labels corretas (Agenda, Serviços, Atendimento para barbeiro).
@@ -57,59 +53,26 @@ class MainNavigationViewController: UITabBarController, UITabBarControllerDelega
         applyThemeForCurrentBusinessType()
     }
 
-    /// Aplica tema (TabBar + NavBar) conforme BusinessProvider.isBarber.
     func applyThemeForCurrentBusinessType() {
-        if BusinessProvider.isBarber {
-            applyBarberTheme()
-        } else {
-            applyOrangeTheme()
-        }
-    }
-
-    private func applyOrangeTheme() {
-        tabBar.tintColor = .pedidosOrange
-        tabBar.unselectedItemTintColor = .pedidosTextSecondary
-        tabBar.backgroundColor = .systemBackground
+        tabBar.tintColor = .appPrimaryBlack
+        tabBar.unselectedItemTintColor = .appSubtitleGray
+        tabBar.backgroundColor = .appCardWhite
+        tabBar.barTintColor = .appCardWhite
 
         let appearance = UINavigationBarAppearance()
         appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = .systemBackground
-        appearance.titleTextAttributes = [.foregroundColor: UIColor.pedidosOrange]
+        appearance.backgroundColor = .appCardWhite
+        appearance.titleTextAttributes = [.foregroundColor: UIColor.appTitleBlack]
+        appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.appTitleBlack]
 
         for case let nav as UINavigationController in viewControllers ?? [] {
             nav.navigationBar.standardAppearance = appearance
             nav.navigationBar.scrollEdgeAppearance = appearance
             nav.navigationBar.compactAppearance = appearance
-            nav.navigationBar.tintColor = .pedidosOrange
-            nav.navigationBar.barTintColor = .systemBackground
+            nav.navigationBar.tintColor = .appPrimaryBlack
+            nav.navigationBar.barTintColor = .appCardWhite
             nav.navigationBar.isTranslucent = false
             nav.navigationBar.prefersLargeTitles = false
-        }
-    }
-
-    private func applyBarberTheme() {
-        // Tab Bar: preto, opaco
-        tabBar.tintColor = .barberPrimary
-        tabBar.unselectedItemTintColor = .barberTextSecondary
-        tabBar.backgroundColor = .barberNavBackground
-        tabBar.barTintColor = .barberNavBackground
-
-        // Nav Bar: preto opaco, títulos dourados, sem transparência
-        let appearance = UINavigationBarAppearance()
-        appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = .barberNavBackground
-        appearance.titleTextAttributes = [.foregroundColor: UIColor.barberPrimary]
-        appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.barberPrimary]
-
-        for case let nav as UINavigationController in viewControllers ?? [] {
-            nav.navigationBar.standardAppearance = appearance
-            nav.navigationBar.scrollEdgeAppearance = appearance
-            nav.navigationBar.compactAppearance = appearance
-            nav.navigationBar.tintColor = .barberPrimary
-            nav.navigationBar.barTintColor = .barberNavBackground
-            nav.navigationBar.isTranslucent = false
-            nav.navigationBar.prefersLargeTitles = false
-            nav.navigationBar.overrideUserInterfaceStyle = .dark
         }
     }
     

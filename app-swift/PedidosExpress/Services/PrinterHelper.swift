@@ -43,33 +43,10 @@ class PrinterHelper: NSObject, ObservableObject {
         
         switch centralManager.state {
         case .poweredOn:
-            let msg = "✅ PrinterHelper: Bluetooth está ligado"
-            logger.info("\(msg)")
-            print("\(msg)")
-        case .poweredOff:
-            let msg = "❌ PrinterHelper: Bluetooth está desligado"
-            logger.error("\(msg)")
-            print("\(msg)")
+            break
+        case .poweredOff, .unauthorized, .unsupported, .resetting, .unknown:
             return
-        case .unauthorized:
-            let msg = "❌ PrinterHelper: Bluetooth não autorizado"
-            logger.error("\(msg)")
-            print("\(msg)")
-            return
-        case .unsupported:
-            let msg = "❌ PrinterHelper: Bluetooth não suportado"
-            logger.error("\(msg)")
-            print("\(msg)")
-            return
-        case .resetting:
-            let msg = "⚠️ PrinterHelper: Bluetooth está resetando"
-            logger.warning("\(msg)")
-            print("\(msg)")
-            return
-        default:
-            let msg = "⚠️ PrinterHelper: Estado do Bluetooth desconhecido: \(centralManager.state.rawValue)"
-            logger.warning("\(msg)")
-            print("\(msg)")
+        @unknown default:
             return
         }
         
@@ -514,19 +491,13 @@ extension PrinterHelper: CBCentralManagerDelegate {
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
         switch central.state {
         case .poweredOn:
-            logger.info("✅ PrinterHelper: Bluetooth ligado")
-            // Não fazer scan automático aqui, apenas quando solicitado pelo usuário
+            break
         case .poweredOff:
-            logger.error("❌ PrinterHelper: Bluetooth desligado")
             isConnected = false
-        case .unauthorized:
-            logger.error("❌ PrinterHelper: Bluetooth não autorizado")
-        case .unsupported:
-            logger.error("❌ PrinterHelper: Bluetooth não suportado")
-        case .resetting:
-            logger.warning("⚠️ PrinterHelper: Bluetooth resetando")
+        case .unauthorized, .unsupported, .resetting, .unknown:
+            break
         @unknown default:
-            logger.warning("⚠️ PrinterHelper: Estado desconhecido: \(central.state.rawValue)")
+            break
         }
     }
     

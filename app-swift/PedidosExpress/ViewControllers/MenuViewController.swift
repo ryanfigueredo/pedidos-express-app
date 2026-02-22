@@ -18,9 +18,6 @@ class MenuViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        if BusinessProvider.isBarber {
-            overrideUserInterfaceStyle = .dark
-        }
         let user = AuthService().getUser()
         title = BusinessTypeHelper.menuLabel(for: user)
         navigationItem.largeTitleDisplayMode = .never
@@ -36,12 +33,17 @@ class MenuViewController: UIViewController {
         )
     }
     
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        loadMenu(silent: true)
+    }
+    
     private func setupUI() {
         view.backgroundColor = BusinessProvider.backgroundColor
 
         segmentedControl = UISegmentedControl(items: categories)
         segmentedControl.selectedSegmentIndex = 0
-        segmentedControl.backgroundColor = BusinessProvider.isBarber ? .barberCard : .systemBackground
+        segmentedControl.backgroundColor = BusinessProvider.cardBackgroundColor
         segmentedControl.selectedSegmentTintColor = BusinessProvider.primaryColor
         segmentedControl.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .selected)
         segmentedControl.setTitleTextAttributes([.foregroundColor: BusinessProvider.textSecondaryColor], for: .normal)
@@ -49,7 +51,7 @@ class MenuViewController: UIViewController {
         segmentedControl.translatesAutoresizingMaskIntoConstraints = false
 
         let segmentedContainer = UIView()
-        segmentedContainer.backgroundColor = BusinessProvider.isBarber ? .barberBackground : .systemBackground
+        segmentedContainer.backgroundColor = BusinessProvider.backgroundColor
         segmentedContainer.translatesAutoresizingMaskIntoConstraints = false
         segmentedContainer.addSubview(segmentedControl)
 
@@ -136,19 +138,14 @@ class MenuViewController: UIViewController {
         menuTableView.reloadData()
     }
     
-    override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-        loadMenu()
-    }
-    
     private func setupTableView() {
         menuTableView.delegate = self
         menuTableView.dataSource = self
         menuTableView.register(MenuItemTableViewCell.self, forCellReuseIdentifier: "MenuItemCell")
     }
     
-    private func loadMenu() {
-        progressIndicator.startAnimating()
+    private func loadMenu(silent: Bool = false) {
+        if !silent { progressIndicator.startAnimating() }
         
         Task {
             do {
@@ -157,7 +154,7 @@ class MenuViewController: UIViewController {
                 await MainActor.run {
                     self.allMenuItems = items
                     self.filterMenuItems()
-                    self.progressIndicator.stopAnimating()
+                    if !silent { self.progressIndicator.stopAnimating() }
                     
                     // Se não houver itens, não mostrar erro (é normal)
                     if items.isEmpty {
@@ -167,9 +164,9 @@ class MenuViewController: UIViewController {
                 }
             } catch {
                 await MainActor.run {
-                    self.progressIndicator.stopAnimating()
+                    if !silent { self.progressIndicator.stopAnimating() }
                     
-                    // Mensagem mais amigável baseada no tipo de erro
+                    // Mensagem mais amigável baseada no tipo de erro (apenas quando não for silent)
                     var errorMessage = "Erro ao carregar cardápio."
                     var errorTitle = "Erro"
                     
@@ -206,7 +203,7 @@ class MenuViewController: UIViewController {
                         errorMessage = error.localizedDescription.isEmpty ? "Erro desconhecido ao carregar cardápio." : error.localizedDescription
                     }
                     
-                    self.showAlert(title: errorTitle, message: errorMessage)
+                    if !silent { self.showAlert(title: errorTitle, message: errorMessage) }
                 }
             }
         }
@@ -286,10 +283,14 @@ class MenuViewController: UIViewController {
         
         Task {
             do {
-                _ = try await apiService.createMenuItem(id: id, name: name, price: price, category: category)
+                let newItem = try await apiService.createMenuItem(id: id, name: name, price: price, category: category)
                 
                 await MainActor.run {
                     self.progressIndicator.stopAnimating()
+                    if !self.allMenuItems.contains(where: { $0.id == newItem.id }) {
+                        self.allMenuItems.append(newItem)
+                        self.filterMenuItems()
+                    }
                     self.loadMenu()
                 }
             } catch {
